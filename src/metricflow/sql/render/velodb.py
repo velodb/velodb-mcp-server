@@ -30,7 +30,7 @@ from metricflow.sql.render.sql_plan_renderer import DefaultSqlPlanRenderer
 
 
 class VeloDBSqlExpressionRenderer(DefaultSqlExpressionRenderer):
-    """Expression renderer for the Apache VeloDB engine.
+    """Expression renderer for the VeloDB engine.
 
     VeloDB uses MySQL-compatible protocol but has its own SQL dialect differences:
     - Uses DATETIME instead of TIMESTAMP
@@ -178,7 +178,7 @@ class VeloDBSqlExpressionRenderer(DefaultSqlExpressionRenderer):
 
 
 class VeloDBSqlPlanRenderer(DefaultSqlPlanRenderer):
-    """Plan renderer for the Apache VeloDB engine."""
+    """Plan renderer for the VeloDB engine."""
 
     EXPR_RENDERER = VeloDBSqlExpressionRenderer()
 

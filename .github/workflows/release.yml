@@ -5,8 +5,9 @@
 #     1. Push a tag manually:  git tag velodb-mcp-server-0.2.5 && git push origin velodb-mcp-server-0.2.5
 #     2. Trigger manually from the Actions page (version number required)
 #
-#   Artifacts:  velodb-mcp-server-<version>-linux-x64.tar.gz
-#              velodb-mcp-server-<version>-linux-arm64.tar.gz
+#   Artifacts:  velodb-mcp-server-<version>-linux_x64.tar.gz
+#              velodb-mcp-server-<version>-linux_arm64.tar.gz
+#   (platform names use underscores in tarball filenames, produced by build.sh)
 #   Both extract to the top-level directory velodb-mcp-server/ (consistent with the original build.sh convention)
 #
 #   Notes:  private repos have no free ARM runners, so linux-arm64 is cross-built
@@ -62,7 +63,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: velodb-mcp-server-${{ needs.version.outputs.version }}-${{ matrix.platform }}
-          path: dist/velodb-mcp-server-${{ needs.version.outputs.version }}-${{ matrix.platform }}.tar.gz
+          # Each matrix job builds a single platform, so dist/ contains exactly one tarball.
+          path: dist/*.tar.gz
           if-no-files-found: error
 
   # ── Tag + publish the Release ──────────────────────────────────────────

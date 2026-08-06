@@ -2,7 +2,7 @@
 
 ## Overview
 
-**velodb-mcp-server** is an Apache VeloDB query service based on the MCP (Model Context Protocol). It exposes VeloDB data query capabilities through FastMCP's streamable-http transport, ships with a semantic metrics layer built on MetricFlow v0.209.0, supports multi-workspace isolation, and provides both a Web UI and a CLI for administration.
+**velodb-mcp-server** is a VeloDB query service based on the MCP (Model Context Protocol). It exposes VeloDB data query capabilities through FastMCP's streamable-http transport, ships with a semantic metrics layer built on MetricFlow v0.209.0, supports multi-workspace isolation, and provides both a Web UI and a CLI for administration.
 
 ```
                      MCP protocol (streamable-http, stateless)
@@ -41,7 +41,7 @@
                                │ pymysql / aiomysql
                                ▼
                     ┌─────────────────────┐
-                    │   Apache VeloDB FE   │
+                    │      VeloDB FE       │
                     │   127.0.0.1:9030    │
                     │                     │
                     │  system_mcp.*       │  ← workspace storage
@@ -554,8 +554,8 @@ dist/
 Each release produces linux-x64 and linux-arm64 packages (private repos have no free ARM runners; arm64 is cross-built on an x64 runner via `build.sh`):
 
 ```
-velodb-mcp-server-0.2.3-linux-x64.tar.gz
-velodb-mcp-server-0.2.3-linux-arm64.tar.gz
+velodb-mcp-server-0.2.3-linux_x64.tar.gz
+velodb-mcp-server-0.2.3-linux_arm64.tar.gz
 ```
 
 Both packages extract to the same top-level directory `velodb-mcp-server/`, so deployment scripts need no changes.
@@ -564,7 +564,7 @@ Both packages extract to the same top-level directory `velodb-mcp-server/`, so d
 
 ```bash
 # 1. Extract
-tar xzf velodb-mcp-server-{version}-linux-x64.tar.gz
+tar xzf velodb-mcp-server-{version}-linux_x64.tar.gz
 cd velodb-mcp-server
 
 # 2. Configure (optional; the default localhost:9030 works)

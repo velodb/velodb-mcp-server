@@ -19,7 +19,7 @@ under the License.
 
 # VeloDB MCP Server
 
-VeloDB MCP Server is a backend service that exposes [Apache VeloDB](https://velodb.apache.org/) through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). AI clients (Claude Desktop, Cursor, VS Code, and others) can query VeloDB data through a governed **semantic metrics layer** built on [MetricFlow](https://github.com/dbt-labs/metricflow), with raw-SQL discovery as a fallback path. It ships with a Web UI for managing semantic models and a CLI client for scripting.
+VeloDB MCP Server is a backend service that exposes [VeloDB](https://www.velodb.com/) through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). AI clients (Claude Desktop, Cursor, VS Code, and others) can query VeloDB data through a governed **semantic metrics layer** built on [MetricFlow](https://github.com/dbt-labs/metricflow), with raw-SQL discovery as a fallback path. It ships with a Web UI for managing semantic models and a CLI client for scripting.
 
 ## Core Features
 
@@ -36,8 +36,28 @@ VeloDB MCP Server is a backend service that exposes [Apache VeloDB](https://velo
 ## System Requirements
 
 *   **Server host**: Linux x86_64 or ARM64 (for running the release package)
-*   **Database**: Apache VeloDB FE reachable via MySQL protocol (default `127.0.0.1:9030`)
+*   **Database**: VeloDB (Cloud or Enterprise) FE reachable via MySQL protocol (default `127.0.0.1:9030`)
 *   **Building from source**: curl/wget, or a local Python 3.10.x for offline builds
+
+## 🤖 Install with an AI Agent (no docs reading required)
+
+If you use Claude Code (or another MCP-capable agent), you don't need to read
+this README at all. Just paste this into your agent:
+
+> **"Install this MCP server per this README and tell me how to connect my VeloDB cluster."**
+
+The agent will:
+
+1. Ask you 2–3 questions — **VeloDB Cloud or Enterprise**, your connection
+   address and credentials, and where to install.
+2. Download the matching release (self-contained: Python runtime and all
+   dependencies are bundled — nothing else to install).
+3. Configure `mcp-server.toml`, start the server, and health-check it.
+4. Register itself as the `velodb` MCP server in your AI client.
+5. Verify the connection end-to-end and confirm you can start querying.
+
+The agent-facing step-by-step playbook (including failure handling) lives in
+[AGENTS.md](AGENTS.md). Agents reading this README should follow that file.
 
 ## 🚀 Quick Start
 
@@ -46,7 +66,7 @@ VeloDB MCP Server is a backend service that exposes [Apache VeloDB](https://velo
 Download the latest release from [Releases](../../releases):
 
 ```bash
-tar xzf velodb-mcp-server-<version>-linux-x64.tar.gz
+tar xzf velodb-mcp-server-<version>-linux_x64.tar.gz
 cd velodb-mcp-server
 ```
 
@@ -182,6 +202,7 @@ bash test/run_all_tests.sh             # full suite (needs a local server)
 
 ## Documentation
 
+*   [AGENTS.md](AGENTS.md) — agent-facing installation playbook (AI agents read this to install everything automatically)
 *   [DESIGN.md](DESIGN.md) — architecture and design decisions
 *   [INSTALL.html](INSTALL.html) — installation guide
 *   [velodb-mcp-docs.html](velodb-mcp-docs.html) — semantic model reference and user guide

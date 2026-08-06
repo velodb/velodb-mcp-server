@@ -8,7 +8,7 @@ from server import _decode_webui_session_cookie, create_server, resolve_machine_
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="velodb-mcp-server: MCP Server for Apache VeloDB")
+    parser = argparse.ArgumentParser(description="velodb-mcp-server: MCP Server for VeloDB")
     parser.add_argument("--config-dir", default=os.environ.get("VELODB_MCP_CONFIG_DIR", "."))
     parser.add_argument("--env-file", default=None)
     args = parser.parse_args()
