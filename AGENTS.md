@@ -22,7 +22,7 @@ then execute the steps in order.**
 ## Overview of what you will do
 
 ```
-Step 0  Ask the user 3 short questions (deployment type, connection info, install location)
+Step 0  Ask the user 2 short questions (connection info, install location)
 Step 1  Detect the platform and download the matching release tarball
 Step 2  Write the VeloDB FE address into mcp-server.toml
 Step 3  Start the server in the background and health-check it
@@ -40,24 +40,23 @@ consult the [Failure handling](#failure-handling) table.
 Ask the user **exactly** these questions (in one message), then wait for the
 answers:
 
-1. **Deployment type**: VeloDB **Cloud** (managed service) or VeloDB
-   **Enterprise** (self-hosted / on-premise)?
-2. **Connection info**:
-   - Cloud: the endpoint host (e.g. `abc123.ap-southeast-1.velodb.cloud`),
-     username, and password.
-   - Enterprise: the FE host (IP or hostname) and MySQL-protocol port
-     (default `9030`), username, and password.
-3. **Install location**: on **this machine** (where you are running), or on a
+1. **Connection info**: the VeloDB FE host (endpoint domain, IP, or
+   hostname) and MySQL-protocol port, plus a username and password.
+2. **Install location**: on **this machine** (where you are running), or on a
    **remote server**? If remote, ask how you can reach it (e.g. SSH access).
 
 Rules:
 
-- The VeloDB MySQL-protocol port is **9030** in both Cloud and Enterprise
-  unless the user says otherwise. Do not ask about it separately; just confirm.
+- VeloDB Cloud, VeloDB Enterprise, and Apache Doris all speak the same
+  MySQL protocol, so this server connects to any of them the same way —
+  **do not ask which deployment type the user has**; you only need the FE
+  address and credentials.
+- The default MySQL-protocol port is **9030**. Do not ask about it
+  separately; only confirm if the user gave a non-default port.
 - The machine running this MCP server must be able to reach the FE host:9030.
-  If the user picked Enterprise with a private IP and wants to install on a
-  laptop that cannot reach that IP, tell them and ask for a reachable
-  install location instead.
+  If the FE address is a private IP and the user wants to install on a laptop
+  that cannot reach it, tell them and ask for a reachable install location
+  instead.
 - Never print the user's password back in chat output beyond what is
   necessary to complete the setup commands.
 
@@ -136,9 +135,9 @@ sed -i.bak \
   mcp-server.toml
 ```
 
-- Cloud: `<FE_HOST>` is the endpoint host from Step 0, `<FE_PORT>` is `9030`.
-- Enterprise: `<FE_HOST>` is the FE IP/hostname, `<FE_PORT>` is `9030`
-  (unless the user gave a different one).
+- `<FE_HOST>` is the FE address from Step 0 (endpoint domain for VeloDB
+  Cloud, or IP/hostname for a self-hosted cluster), `<FE_PORT>` is `9030`
+  unless the user gave a different one.
 
 Leave everything else at defaults. Do not change `[query]` or `[logging]`
 unless the user asks.
@@ -229,7 +228,7 @@ Do **not** include the password in this summary.
 | `curl` to `/mcp/web/login` fails / empty | Server not up yet or crashed | `cat /tmp/velodb-mcp-server.log`, fix the reported error, restart |
 | Port 3000 already in use | Another process holds it | `lsof -i :3000` (macOS) / `fuser -k 3000/tcp` (Linux), or set a different `mcp_port` |
 | Health check returns 401 | Wrong username/password or bad token format | Token must be exactly `username:password`; re-run Step 4 with correct credentials |
-| Health check shows `"velodb": "unavailable"` | FE unreachable from this machine | Verify `nc -zv <FE_HOST> 9030`; check `fe_host`/`fe_port` in `mcp-server.toml`; if Enterprise with a private IP, install on a machine inside that network |
+| Health check shows `"velodb": "unavailable"` | FE unreachable from this machine | Verify `nc -zv <FE_HOST> 9030`; check `fe_host`/`fe_port` in `mcp-server.toml`; if the FE address is a private IP, install on a machine inside that network |
 | No release asset for this platform | CI builds Linux only | Use the source-build fallback in Step 1 |
 | Workspace shows `not_ready` | Broken or missing semantic models | Log into the Web UI (`/mcp/web`) → Validate to see the error; unrelated to connectivity |
 

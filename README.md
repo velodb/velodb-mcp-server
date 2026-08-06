@@ -36,7 +36,7 @@ VeloDB MCP Server is a backend service that exposes [VeloDB](https://www.velodb.
 ## System Requirements
 
 *   **Server host**: Linux x86_64 or ARM64 (for running the release package)
-*   **Database**: VeloDB (Cloud or Enterprise) FE reachable via MySQL protocol (default `127.0.0.1:9030`)
+*   **Database**: any MySQL-protocol-compatible Doris-family cluster — VeloDB Cloud, VeloDB Enterprise, or Apache Doris — with the FE reachable (default `127.0.0.1:9030`)
 *   **Building from source**: curl/wget, or a local Python 3.10.x for offline builds
 
 ## 🤖 Install with an AI Agent (no docs reading required)
@@ -48,8 +48,9 @@ this README at all. Just paste this into your agent:
 
 The agent will:
 
-1. Ask you 2–3 questions — **VeloDB Cloud or Enterprise**, your connection
-   address and credentials, and where to install.
+1. Ask you 2 questions — your **VeloDB connection address and credentials**
+   (works the same for VeloDB Cloud, VeloDB Enterprise, and Apache Doris,
+   all of which speak the MySQL protocol), and **where to install**.
 2. Download the matching release (self-contained: Python runtime and all
    dependencies are bundled — nothing else to install).
 3. Configure `mcp-server.toml`, start the server, and health-check it.
