@@ -2,12 +2,12 @@
 # Release — build linux x64 / arm64 and publish a GitHub Release
 #
 #   Triggers (both manual; PR merges no longer auto-release):
-#     1. Push a tag manually:  git tag doris-mcp-server-0.2.5 && git push origin doris-mcp-server-0.2.5
+#     1. Push a tag manually:  git tag velodb-mcp-server-0.2.5 && git push origin velodb-mcp-server-0.2.5
 #     2. Trigger manually from the Actions page (version number required)
 #
-#   Artifacts:  doris-mcp-server-<version>-linux-x64.tar.gz
-#              doris-mcp-server-<version>-linux-arm64.tar.gz
-#   Both extract to the top-level directory doris-mcp-server/ (consistent with the original build.sh convention)
+#   Artifacts:  velodb-mcp-server-<version>-linux-x64.tar.gz
+#              velodb-mcp-server-<version>-linux-arm64.tar.gz
+#   Both extract to the top-level directory velodb-mcp-server/ (consistent with the original build.sh convention)
 #
 #   Notes:  private repos have no free ARM runners, so linux-arm64 is cross-built
 #         on an x64 runner via build.sh (pip --platform wheel unpacking).
@@ -18,7 +18,7 @@ name: Release
 
 on:
   push:
-    tags: ["doris-mcp-server-*"]
+    tags: ["velodb-mcp-server-*"]
   workflow_dispatch:
     inputs:
       version:
@@ -38,7 +38,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             V="${{ inputs.version }}"
           else
-            V="${GITHUB_REF_NAME#doris-mcp-server-}"
+            V="${GITHUB_REF_NAME#velodb-mcp-server-}"
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
@@ -61,8 +61,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: doris-mcp-server-${{ needs.version.outputs.version }}-${{ matrix.platform }}
-          path: dist/doris-mcp-server-${{ needs.version.outputs.version }}-${{ matrix.platform }}.tar.gz
+          name: velodb-mcp-server-${{ needs.version.outputs.version }}-${{ matrix.platform }}
+          path: dist/velodb-mcp-server-${{ needs.version.outputs.version }}-${{ matrix.platform }}.tar.gz
           if-no-files-found: error
 
   # ── Tag + publish the Release ──────────────────────────────────────────
@@ -75,7 +75,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: doris-mcp-server-*
+          pattern: velodb-mcp-server-*
           path: dist
           merge-multiple: true
 
@@ -83,7 +83,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           # If the tag does not exist, it is created automatically on the current commit
-          tag_name: doris-mcp-server-${{ needs.version.outputs.version }}
-          name: doris-mcp-server-${{ needs.version.outputs.version }}
+          tag_name: velodb-mcp-server-${{ needs.version.outputs.version }}
+          name: velodb-mcp-server-${{ needs.version.outputs.version }}
           files: dist/*.tar.gz
           body: ""

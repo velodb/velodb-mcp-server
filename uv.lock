@@ -399,7 +399,7 @@ wheels = [
 ]
 
 [[package]]
-name = "doris-new-mcp"
+name = "velodb-mcp-server"
 version = "1.3.1"
 source = { virtual = "." }
 dependencies = [
