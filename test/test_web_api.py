@@ -14,8 +14,8 @@ Usage:
 Environment variables:
   MCP_BASE_URL               Server address (default http://localhost:3000)
   MCP_TOKEN                  Bearer token (default admin:admin)
-  DORIS_USER / DORIS_PASS    Doris login credentials (default admin / admin)
-  DORIS_MCP_TEST_DESTRUCTIVE=1  enables destructive test cases (discarding
+  VELODB_USER / VELODB_PASS    VeloDB login credentials (default admin / admin)
+  VELODB_MCP_TEST_DESTRUCTIVE=1  enables destructive test cases (discarding
                                 staged changes, creating/deleting workspaces);
                                 skipped by default
 """
@@ -33,11 +33,11 @@ from urllib.parse import urlencode
 BASE_URL = os.environ.get("MCP_BASE_URL", "http://localhost:3000")
 AUTH_TOKEN = os.environ.get("MCP_TOKEN", "admin:admin")
 WORKSPACE = os.environ.get("MCP_WORKSPACE", "example")
-TEST_DORIS_USER = os.environ.get("DORIS_USER", "admin")
-TEST_DORIS_PASS = os.environ.get("DORIS_PASS", "admin")
+TEST_VELODB_USER = os.environ.get("VELODB_USER", "admin")
+TEST_VELODB_PASS = os.environ.get("VELODB_PASS", "admin")
 # Destructive cases (discard real staged changes on a shared server, create/delete workspaces)
-# Skipped by default; only run when DORIS_MCP_TEST_DESTRUCTIVE=1 is set explicitly
-DESTRUCTIVE = os.environ.get("DORIS_MCP_TEST_DESTRUCTIVE") == "1"
+# Skipped by default; only run when VELODB_MCP_TEST_DESTRUCTIVE=1 is set explicitly
+DESTRUCTIVE = os.environ.get("VELODB_MCP_TEST_DESTRUCTIVE") == "1"
 
 HEADERS = {
     "Authorization": f"Bearer {AUTH_TOKEN}",
@@ -49,10 +49,10 @@ JSON_HEADERS = {
 
 
 def _require_destructive():
-    """Guard for destructive cases: skip unless DORIS_MCP_TEST_DESTRUCTIVE=1 is set."""
+    """Guard for destructive cases: skip unless VELODB_MCP_TEST_DESTRUCTIVE=1 is set."""
     if not DESTRUCTIVE:
         raise unittest.SkipTest(
-            "Skipping: destructive cases require DORIS_MCP_TEST_DESTRUCTIVE=1"
+            "Skipping: destructive cases require VELODB_MCP_TEST_DESTRUCTIVE=1"
         )
 
 
@@ -121,11 +121,11 @@ def test_webui_login_page():
 
 
 def test_webui_login_post():
-    """POST /mcp/web/login — log in with Doris credentials"""
+    """POST /mcp/web/login — log in with VeloDB credentials"""
     import urllib.parse
     form_data = urlencode({
-        "username": TEST_DORIS_USER,
-        "password": TEST_DORIS_PASS,
+        "username": TEST_VELODB_USER,
+        "password": TEST_VELODB_PASS,
     }).encode()
     req = urllib.request.Request(
         f"{BASE_URL}/mcp/web/login",
@@ -295,7 +295,7 @@ def test_bearer_token_format():
     # Correct format
     ok_headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {TEST_DORIS_USER}:{TEST_DORIS_PASS}",
+        "Authorization": f"Bearer {TEST_VELODB_USER}:{TEST_VELODB_PASS}",
         "Accept": "application/json, text/event-stream",
     }
     payload = {

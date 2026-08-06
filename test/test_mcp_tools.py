@@ -3,7 +3,7 @@
 MCP Tool test cases — covers all 10 Tools
 
 Environment:
-  - Doris FE 127.0.0.1:9030, admin:admin
+  - VeloDB FE 127.0.0.1:9030, admin:admin
   - MCP Server http://localhost:3000/mcp
   - Python 3.10+
 
@@ -96,15 +96,15 @@ def test_get_query_guide():
 def test_check_service_health_basic():
     """Tool #2: basic health check"""
     data = _assert_success(_call_tool("check_service_health", {}))
-    assert data["data"]["doris"] == "connected", f"Doris not connected: {data}"
+    assert data["data"]["velodb"] == "connected", f"VeloDB not connected: {data}"
     assert "workspaces" in data["data"], "Missing workspaces"
-    print(f"  ✅ Doris connected, workspaces: {list(data['data']['workspaces'].keys())}")
+    print(f"  ✅ VeloDB connected, workspaces: {list(data['data']['workspaces'].keys())}")
 
 
 def test_check_service_health_detail():
     """Tool #2: detailed health check"""
     data = _assert_success(_call_tool("check_service_health", {"detail": True}))
-    assert data["data"]["doris"] == "connected"
+    assert data["data"]["velodb"] == "connected"
     print(f"  ✅ Detailed health check passed")
 
 
@@ -340,11 +340,11 @@ def test_execute_query_select():
 
 
 def test_execute_query_version():
-    """Tool #9: raw SQL — Doris version"""
+    """Tool #9: raw SQL — VeloDB version"""
     data = _assert_success(
         _call_tool("execute_query", {"sql": "SELECT VERSION()"})
     )
-    print(f"  ✅ Doris version: {data['data']['rows'][0]}")
+    print(f"  ✅ VeloDB version: {data['data']['rows'][0]}")
 
 
 def test_execute_query_with_database():

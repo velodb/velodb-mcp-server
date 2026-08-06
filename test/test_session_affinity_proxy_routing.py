@@ -19,7 +19,7 @@ from core.session_affinity_proxy import SessionAffinityProxy  # noqa: E402
 
 REMOTE_IP = "10.23.45.67"
 LOCAL_IP = "127.0.0.1"
-COOKIE = "doris_mcp_session"
+COOKIE = "velodb_mcp_session"
 
 
 class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
@@ -101,7 +101,7 @@ class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_only_web_route_and_children_with_remote_cookie_are_proxied(self) -> None:
         proxy, local, requests, client = self.make_proxy()
-        remote_headers = [(b"cookie", b"doris_mcp_session=remote")]
+        remote_headers = [(b"cookie", b"velodb_mcp_session=remote")]
         try:
             for path in ("/mcp", "/mcp/webx"):
                 result = await self.invoke(proxy, path=path, headers=remote_headers)
@@ -119,7 +119,7 @@ class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
         try:
             for method in ("GET", "POST"):
                 result = await self.invoke(proxy, path="/mcp/web/login", method=method,
-                                           headers=[(b"cookie", b"doris_mcp_session=remote")], body=b"credentials")
+                                           headers=[(b"cookie", b"velodb_mcp_session=remote")], body=b"credentials")
                 self.assertEqual(result[0]["status"], 201)
             self.assertEqual(requests, [])
             self.assertEqual([scope["method"] for scope in local], ["GET", "POST"])
@@ -130,11 +130,11 @@ class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
         proxy, local, requests, client = self.make_proxy()
         cases = [
             [],
-            [(b"cookie", b"doris_mcp_session=invalid")],
-            [(b"cookie", b"doris_mcp_session=local")],
-            [(b"cookie", b"doris_mcp_session=remote; doris_mcp_session=remote")],
-            [(b"cookie", b"doris_mcp_session=remote"), (b"cookie", b"doris_mcp_session=remote")],
-            [(b"x-doris-session-affinity-hop", b"forged")],
+            [(b"cookie", b"velodb_mcp_session=invalid")],
+            [(b"cookie", b"velodb_mcp_session=local")],
+            [(b"cookie", b"velodb_mcp_session=remote; velodb_mcp_session=remote")],
+            [(b"cookie", b"velodb_mcp_session=remote"), (b"cookie", b"velodb_mcp_session=remote")],
+            [(b"x-velodb-session-affinity-hop", b"forged")],
         ]
         try:
             for headers in cases:
@@ -142,7 +142,7 @@ class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result[0]["status"], 201)
             self.assertEqual(requests, [])
             self.assertTrue(all(
-                b"x-doris-session-affinity-hop" not in {name.lower() for name, _ in scope["headers"]}
+                b"x-velodb-session-affinity-hop" not in {name.lower() for name, _ in scope["headers"]}
                 for scope in local
             ))
         finally:
@@ -151,7 +151,7 @@ class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
     async def test_proxy_preserves_request_parts_and_strips_routing_hop_headers(self) -> None:
         proxy, _, requests, client = self.make_proxy()
         headers = [
-            (b"host", b"attacker.invalid"), (b"cookie", b"doris_mcp_session=remote"),
+            (b"host", b"attacker.invalid"), (b"cookie", b"velodb_mcp_session=remote"),
             (b"x-normal", b"one"), (b"x-normal", b"two"), (b"connection", b"x-remove, Keep-Alive"),
             (b"x-remove", b"gone"), (b"keep-alive", b"timeout=5"), (b"te", b"trailers"),
             (b"transfer-encoding", b"compress"), (b"upgrade", b"websocket"),
@@ -167,7 +167,7 @@ class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
             raw = request.headers.raw
             self.assertIn((b"x-normal", b"one"), raw)
             self.assertIn((b"x-normal", b"two"), raw)
-            self.assertIn((b"x-doris-session-affinity-hop", b"1"), raw)
+            self.assertIn((b"x-velodb-session-affinity-hop", b"1"), raw)
             forwarded_names = {name.lower() for name, _ in raw}
             self.assertNotIn(b"x-remove", forwarded_names)
             # httpx may add its own Connection/Transfer-Encoding framing for a
@@ -188,8 +188,8 @@ class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
         proxy, _, requests, client = self.make_proxy()
         try:
             for value in (b"forged", b"1"):
-                result = await self.invoke(proxy, headers=[(b"cookie", b"doris_mcp_session=remote"),
-                                                           (b"x-doris-session-affinity-hop", value)])
+                result = await self.invoke(proxy, headers=[(b"cookie", b"velodb_mcp_session=remote"),
+                                                           (b"x-velodb-session-affinity-hop", value)])
                 self.assertEqual(result[0]["status"], 502)
                 self.assertEqual(self.response_body(result), b"Bad Gateway")
                 self.assertNotIn(REMOTE_IP.encode(), self.response_body(result))
@@ -209,7 +209,7 @@ class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         proxy, _, _, client = self.make_proxy(handler)
         try:
-            result = await self.invoke(proxy, headers=[(b"cookie", b"doris_mcp_session=remote")])
+            result = await self.invoke(proxy, headers=[(b"cookie", b"velodb_mcp_session=remote")])
             self.assertEqual(result[0]["status"], 207)
             response_headers = result[0]["headers"]
             self.assertIn((b"x-ordinary", b"ok"), response_headers)
@@ -231,7 +231,7 @@ class SessionAffinityProxyRoutingTests(unittest.IsolatedAsyncioTestCase):
                 raise error
             proxy, _, requests, client = self.make_proxy(handler)
             try:
-                result = await self.invoke(proxy, headers=[(b"cookie", b"doris_mcp_session=remote")])
+                result = await self.invoke(proxy, headers=[(b"cookie", b"velodb_mcp_session=remote")])
                 self.assertEqual(result[0]["status"], 303)
                 location = [v for n, v in result[0]["headers"] if n.lower() == b"location"]
                 self.assertEqual(location, [b"/mcp/web/login"])

@@ -39,7 +39,7 @@ class TestStoreCredentialInjection(unittest.TestCase):
         with patch("store.store.pymysql.connect") as mock_connect:
             st._get_conn()
             mock_connect.assert_called_once_with(
-                host=st._DORIS_HOST, port=st._DORIS_PORT,
+                host=st._VELODB_HOST, port=st._VELODB_PORT,
                 user="admin", password="test_password",
                 charset="utf8mb4", autocommit=True,
                 connect_timeout=5,
@@ -53,7 +53,7 @@ class TestStoreCredentialInjection(unittest.TestCase):
         with patch("store.store.pymysql.connect") as mock_connect:
             st._get_conn()
             mock_connect.assert_called_once_with(
-                host=st._DORIS_HOST, port=st._DORIS_PORT,
+                host=st._VELODB_HOST, port=st._VELODB_PORT,
                 user="alice", password="alice_pass",
                 charset="utf8mb4", autocommit=True,
                 connect_timeout=5,
@@ -69,7 +69,7 @@ class TestStoreCredentialInjection(unittest.TestCase):
         try:
             with self.assertRaises(RuntimeError) as ctx:
                 st._get_conn()
-            self.assertIn("No Doris credentials", str(ctx.exception))
+            self.assertIn("No VeloDB credentials", str(ctx.exception))
         finally:
             st._request_creds.reset(token)
 
@@ -82,7 +82,7 @@ class TestStoreCredentialInjection(unittest.TestCase):
         with patch("store.store.pymysql.connect") as mock_connect:
             st._get_conn()
             mock_connect.assert_called_once_with(
-                host=st._DORIS_HOST, port=st._DORIS_PORT,
+                host=st._VELODB_HOST, port=st._VELODB_PORT,
                 user="admin", password=tricky_password,
                 charset="utf8mb4", autocommit=True,
                 connect_timeout=5,
@@ -261,7 +261,7 @@ class TestLazySeed(unittest.TestCase):
         self.assertEqual(seed_calls[0], ("admin", "pass1"))
 
     def test_seed_injects_before_calling_seed_all(self):
-        """Credentials must be set before seed functions connect to Doris."""
+        """Credentials must be set before seed functions connect to VeloDB."""
         import store.store as st
 
         calls = []
@@ -326,20 +326,20 @@ class TestStoreOperationsWithCredentials(unittest.TestCase):
     def test_store_uses_configured_remote_fe_endpoint(self):
         import store.store as st
 
-        original_host, original_port = st._DORIS_HOST, st._DORIS_PORT
+        original_host, original_port = st._VELODB_HOST, st._VELODB_PORT
         st.set_request_credentials("admin", "remote_pass")
         try:
-            st.set_doris_endpoint("10.20.30.40", 19030)
+            st.set_velodb_endpoint("10.20.30.40", 19030)
             with patch("store.store.pymysql.connect") as mock_connect:
                 st._get_conn()
 
             self.assertEqual(mock_connect.call_args.kwargs["host"], "10.20.30.40")
             self.assertEqual(mock_connect.call_args.kwargs["port"], 19030)
         finally:
-            st.set_doris_endpoint(original_host, original_port)
+            st.set_velodb_endpoint(original_host, original_port)
 
-    def test_doris_store_uses_injected_credentials(self):
-        """DorisStore operations → _get_conn() → uses contextvar creds."""
+    def test_velodb_store_uses_injected_credentials(self):
+        """VeloDBStore operations → _get_conn() → uses contextvar creds."""
         import store.store as st
         st.set_request_credentials("admin", "store_test_pass")
 
@@ -351,8 +351,8 @@ class TestStoreOperationsWithCredentials(unittest.TestCase):
             mock_cursor.fetchall.return_value = []
             mock_connect.return_value = mock_conn
 
-            from store.store import DorisStore
-            store = DorisStore(workspace="test_ws")
+            from store.store import VeloDBStore
+            store = VeloDBStore(workspace="test_ws")
             store.list_files()
 
             # Store creates tables on init + queries on list_files

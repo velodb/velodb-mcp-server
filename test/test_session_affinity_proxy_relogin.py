@@ -1,7 +1,7 @@
 """Offline tests: clear the session cookie and guide re-login when the upstream node is unreachable.
 
 After the target node goes down, the proxy must:
-1. Clear the browser's ``doris_mcp_session`` cookie (Set-Cookie: max-age=0)
+1. Clear the browser's ``velodb_mcp_session`` cookie (Set-Cookie: max-age=0)
 2. Return a 303 redirect to ``/mcp/web/login`` so the user can log in again on a healthy node
 """
 
@@ -22,7 +22,7 @@ from core.session_affinity_proxy import SessionAffinityProxy  # noqa: E402
 
 REMOTE_IP = "10.23.45.67"
 LOCAL_IP = "127.0.0.1"
-_WEBUI_SESSION_COOKIE = b"doris_mcp_session"
+_WEBUI_SESSION_COOKIE = b"velodb_mcp_session"
 
 
 def _remote_scope(**overrides: Any) -> dict[str, Any]:
@@ -32,7 +32,7 @@ def _remote_scope(**overrides: Any) -> dict[str, Any]:
         "path": "/mcp/web/models",
         "raw_path": b"/mcp/web/models",
         "query_string": b"",
-        "headers": [(b"cookie", b"doris_mcp_session=remote")],
+        "headers": [(b"cookie", b"velodb_mcp_session=remote")],
     }
     scope.update(overrides)
     return scope
@@ -208,7 +208,7 @@ class UpstreamUnreachableReloginTests(unittest.IsolatedAsyncioTestCase):
             v for n, v in sent[0]["headers"] if n.lower() == b"set-cookie"
         ]
         self.assertIn(b"keep=me", set_cookie_values)
-        self.assertNotIn(b"doris_mcp_session=;", b"".join(set_cookie_values))
+        self.assertNotIn(b"velodb_mcp_session=;", b"".join(set_cookie_values))
 
     async def test_upstream_5xx_does_not_clear_cookie(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
@@ -268,7 +268,7 @@ class UpstreamUnreachableReloginTests(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertEqual(location, [b"/mcp/web/login"])
 
-        # Set-Cookie clears doris_mcp_session
+        # Set-Cookie clears velodb_mcp_session
         set_cookie_headers = [
             v for n, v in start["headers"] if n.lower() == b"set-cookie"
         ]

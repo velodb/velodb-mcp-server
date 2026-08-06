@@ -85,7 +85,7 @@ class SessionAffinityProxyStreamingTests(unittest.IsolatedAsyncioTestCase):
         return {
             "type": "http", "method": "POST", "path": "/mcp/web/query",
             "raw_path": b"/mcp/web/query", "query_string": b"",
-            "headers": [(b"cookie", b"doris_mcp_session=value")],
+            "headers": [(b"cookie", b"velodb_mcp_session=value")],
         }
 
     @staticmethod

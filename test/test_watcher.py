@@ -8,7 +8,7 @@ Covers:
   - Concurrent request (parsing=True) → skip, use old data
   - Unknown workspace → return None
   - Discover workspace on demand
-  - Doris unreachable → graceful degradation
+  - VeloDB unreachable → graceful degradation
   - Reload failure → keep old state, reset parsing flag
 """
 
@@ -52,7 +52,7 @@ class FakeCompiler:
 
 
 class FakeStore:
-    """Fake DorisStore for testing."""
+    """Fake VeloDBStore for testing."""
     def __init__(self, workspace="test", revision="abc123"):
         self.workspace = workspace
         self._revision = revision
@@ -64,7 +64,7 @@ class FakeStore:
             loaded_at="",
             loaded_epoch=0.0,
             revision=self._revision,
-            source_type="doris",
+            source_type="velodb",
             source_uri=f"system_mcp.active_store_{self.workspace}",
         )
 
@@ -226,7 +226,7 @@ class TestEnsureFreshCooldown(unittest.TestCase):
             loaded_at="2026-07-28T10:00:00Z",
             loaded_epoch=time.time() - 30,  # 30 seconds ago
             revision="abc123",
-            source_type="doris",
+            source_type="velodb",
             source_uri="db",
             metric_count=5,
         )
@@ -264,7 +264,7 @@ class TestEnsureFreshCooldown(unittest.TestCase):
             loaded_at="2026-07-28T09:58:00Z",
             loaded_epoch=old_epoch,
             revision="abc123",
-            source_type="doris",
+            source_type="velodb",
             source_uri="db",
             metric_count=5,
         )
@@ -299,7 +299,7 @@ class TestEnsureFreshCooldown(unittest.TestCase):
             loaded_at="2026-07-28T09:58:00Z",
             loaded_epoch=time.time() - 90,
             revision="abc123",
-            source_type="doris",
+            source_type="velodb",
             source_uri="db",
             metric_count=5,
         )
@@ -326,7 +326,7 @@ class TestEnsureFreshCooldown(unittest.TestCase):
                 loaded_at=SV.now_iso(),
                 loaded_epoch=time.time(),
                 revision="xyz789",
-                source_type="doris",
+                source_type="velodb",
                 source_uri="db",
                 metric_count=1,
             ))
@@ -364,7 +364,7 @@ class TestEnsureFreshCooldown(unittest.TestCase):
                 loaded_at=SV.now_iso(),
                 loaded_epoch=time.time(),
                 revision="abc123",
-                source_type="doris",
+                source_type="velodb",
                 source_uri="db",
                 metric_count=5,
             ))
@@ -404,7 +404,7 @@ class TestEnsureFreshConcurrency(unittest.TestCase):
             loaded_at="2026-07-28T09:58:00Z",
             loaded_epoch=time.time() - 120,  # well past cooldown
             revision="abc123",
-            source_type="doris",
+            source_type="velodb",
             source_uri="db",
             metric_count=5,
         )
@@ -478,8 +478,8 @@ class TestEnsureFreshDiscovery(unittest.TestCase):
 
     def test_unknown_workspace_returns_none(self):
         """When workspace is not in memory and discovery also fails, return None."""
-        from store.store import DorisStore
-        with patch.object(DorisStore, 'discover_workspaces', return_value=[]):
+        from store.store import VeloDBStore
+        with patch.object(VeloDBStore, 'discover_workspaces', return_value=[]):
             result = self.watcher.ensure_fresh("no_such_ws")
         self.assertIsNone(result)
 
@@ -497,14 +497,14 @@ class TestEnsureFreshDiscovery(unittest.TestCase):
                 loaded_at=SemanticLayerVersion.now_iso(),
                 loaded_epoch=time.time(),
                 revision="abc123",
-                source_type="doris",
+                source_type="velodb",
                 source_uri="db",
                 metric_count=5,
             ))
 
         self.watcher._reload_workspace = fake_reload
 
-        # Stub _init_workspace to avoid real Doris connection
+        # Stub _init_workspace to avoid real VeloDB connection
         def fake_init(name, first_load=False):
             ws = _make_workspace_state(
                 name=name, manifest=None, compiler=None,
@@ -516,8 +516,8 @@ class TestEnsureFreshDiscovery(unittest.TestCase):
             return ws
         self.watcher._init_workspace = fake_init
 
-        from store.store import DorisStore
-        with patch.object(DorisStore, 'discover_workspaces', return_value=["new_ws"]):
+        from store.store import VeloDBStore
+        with patch.object(VeloDBStore, 'discover_workspaces', return_value=["new_ws"]):
             result = self.watcher.ensure_fresh("new_ws")
 
         self.assertIsNotNone(result)
@@ -538,9 +538,9 @@ class TestEnsureFreshGracefulDegradation(unittest.TestCase):
         self.watcher._router = MagicMock()
         self.watcher._staging_validated = set()
 
-    # ── Test 9: Doris unreachable, manifest exists → still refuse ──
+    # ── Test 9: VeloDB unreachable, manifest exists → still refuse ──
 
-    def test_doris_unreachable_with_manifest_returns_none(self):
+    def test_velodb_unreachable_with_manifest_returns_none(self):
         """check_remote() failing means the manifest's age is unknown.
 
         Serving it anyway would hand back metric definitions that may be
@@ -553,7 +553,7 @@ class TestEnsureFreshGracefulDegradation(unittest.TestCase):
             loaded_at="2026-07-28T09:58:00Z",
             loaded_epoch=time.time() - 90,
             revision="abc123",
-            source_type="doris",
+            source_type="velodb",
             source_uri="db",
             metric_count=5,
         )
@@ -565,7 +565,7 @@ class TestEnsureFreshGracefulDegradation(unittest.TestCase):
             version=old_version,
         )
         # Store throws on check_remote
-        ws.store.check_remote = MagicMock(side_effect=RuntimeError("Doris down"))
+        ws.store.check_remote = MagicMock(side_effect=RuntimeError("VeloDB down"))
         self.watcher._workspaces["test"] = ws
 
         result = self.watcher.ensure_fresh("test")
@@ -575,9 +575,9 @@ class TestEnsureFreshGracefulDegradation(unittest.TestCase):
             "Should refuse rather than serve a manifest of unknown freshness",
         )
 
-    # ── Test 10: Doris unreachable, no manifest → return None ──
+    # ── Test 10: VeloDB unreachable, no manifest → return None ──
 
-    def test_doris_unreachable_no_manifest_returns_none(self):
+    def test_velodb_unreachable_no_manifest_returns_none(self):
         """When store.check_remote() throws and no manifest, return None."""
         ws = _make_workspace_state(
             name="test",
@@ -586,7 +586,7 @@ class TestEnsureFreshGracefulDegradation(unittest.TestCase):
             known_revision="",
             version=None,
         )
-        ws.store.check_remote = MagicMock(side_effect=RuntimeError("Doris down"))
+        ws.store.check_remote = MagicMock(side_effect=RuntimeError("VeloDB down"))
         self.watcher._workspaces["test"] = ws
 
         result = self.watcher.ensure_fresh("test")
@@ -603,7 +603,7 @@ class TestEnsureFreshGracefulDegradation(unittest.TestCase):
             loaded_at="2026-07-28T09:58:00Z",
             loaded_epoch=time.time() - 90,
             revision="abc123",
-            source_type="doris",
+            source_type="velodb",
             source_uri="db",
             metric_count=5,
         )
@@ -653,7 +653,7 @@ class TestEnsureFreshMultipleCalls(unittest.TestCase):
             loaded_at="2026-07-28T10:00:00Z",
             loaded_epoch=time.time() - 30,
             revision="abc123",
-            source_type="doris",
+            source_type="velodb",
             source_uri="db",
             metric_count=5,
         )
@@ -686,7 +686,7 @@ class TestEnsureFreshMultipleCalls(unittest.TestCase):
             loaded_at="2026-07-28T09:58:00Z",
             loaded_epoch=time.time() - 90,
             revision="abc123",
-            source_type="doris",
+            source_type="velodb",
             source_uri="db",
             metric_count=5,
         )

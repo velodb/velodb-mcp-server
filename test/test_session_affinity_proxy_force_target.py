@@ -56,7 +56,7 @@ class RequestDerivedAffinityTests(unittest.IsolatedAsyncioTestCase):
         async def send(message):
             sent.append(message)
 
-        headers = [] if cookie is None else [(b"cookie", f"doris_mcp_session={cookie}".encode())]
+        headers = [] if cookie is None else [(b"cookie", f"velodb_mcp_session={cookie}".encode())]
         scope = {
             "type": "http",
             "path": path,
