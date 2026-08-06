@@ -1,17 +1,18 @@
 # =============================================================================
-# Release — 构建 linux x64 / arm64 并发布 GitHub Release
+# Release — build linux x64 / arm64 and publish a GitHub Release
 #
-#   触发方式（均为手动，PR 合入不再自动发版）:
-#     1. 手动打 tag:  git tag doris-mcp-server-0.2.5 && git push origin doris-mcp-server-0.2.5
-#     2. Actions 页面手动触发（需填版本号）
+#   Triggers (both manual; PR merges no longer auto-release):
+#     1. Push a tag manually:  git tag doris-mcp-server-0.2.5 && git push origin doris-mcp-server-0.2.5
+#     2. Trigger manually from the Actions page (version number required)
 #
-#   产物:  doris-mcp-server-<version>-linux-x64.tar.gz
-#         doris-mcp-server-<version>-linux-arm64.tar.gz
-#   解压后顶层目录均为 doris-mcp-server/（与 build.sh 原有约定一致）
+#   Artifacts:  doris-mcp-server-<version>-linux-x64.tar.gz
+#              doris-mcp-server-<version>-linux-arm64.tar.gz
+#   Both extract to the top-level directory doris-mcp-server/ (consistent with the original build.sh convention)
 #
-#   说明:  私有仓库无免费 ARM runner，linux-arm64 在 x64 runner 上通过
-#         build.sh 自带的交叉构建完成（pip --platform 解压 wheel）。
-#         仓库转公开后可将 arm64 的 runner 换成 ubuntu-24.04-arm 原生构建。
+#   Notes:  private repos have no free ARM runners, so linux-arm64 is cross-built
+#         on an x64 runner via build.sh (pip --platform wheel unpacking).
+#         Once the repo goes public, the arm64 runner can be switched to a native
+#         ubuntu-24.04-arm build.
 # =============================================================================
 name: Release
 
@@ -21,11 +22,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "版本号（如 0.2.5，不带前缀）"
+        description: "Version number (e.g. 0.2.5, without prefix)"
         required: true
 
 jobs:
-  # ── 计算本次发布的版本号 ─────────────────────────────────────────────
+  # ── Resolve the version number for this release ────────────────────────
   version:
     runs-on: ubuntu-latest
     outputs:
@@ -41,7 +42,7 @@ jobs:
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
-  # ── 构建（x64 原生 + arm64 交叉） ────────────────────────────────────
+  # ── Build (x64 native + arm64 cross) ───────────────────────────────────
   build:
     needs: version
     strategy:
@@ -64,7 +65,7 @@ jobs:
           path: dist/doris-mcp-server-${{ needs.version.outputs.version }}-${{ matrix.platform }}.tar.gz
           if-no-files-found: error
 
-  # ── 打 tag + 发布 Release ────────────────────────────────────────────
+  # ── Tag + publish the Release ──────────────────────────────────────────
   release:
     needs: [version, build]
     runs-on: ubuntu-latest
@@ -81,7 +82,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # tag 不存在时自动在当前 commit 上创建
+          # If the tag does not exist, it is created automatically on the current commit
           tag_name: doris-mcp-server-${{ needs.version.outputs.version }}
           name: doris-mcp-server-${{ needs.version.outputs.version }}
           files: dist/*.tar.gz
