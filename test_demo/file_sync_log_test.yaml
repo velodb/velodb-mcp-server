@@ -1,0 +1,65 @@
+semantic_model:
+  name: file_sync_log_test
+  description: "File sync log; records the history of every sync operation from the staging area to the active store"
+  db_table: system_mcp.file_sync_log_test
+  defaults:
+    agg_time_dimension: sync_time
+  
+  entities:
+    - name: id
+      type: primary
+      expr: id
+    
+    - name: filename
+      type: foreign
+      expr: filename
+
+  dimensions:
+    - name: filename
+      type: categorical
+      expr: filename
+    
+    - name: source
+      type: categorical
+      expr: source
+    
+    - name: sync_status
+      type: categorical
+      expr: sync_status
+    
+    - name: sync_time
+      type: time
+      type_params:
+        time_granularity: day
+      expr: sync_time
+
+  measures:
+    - name: total_sync_count
+      description: "Total number of syncs"
+      agg: count
+      expr: id
+    
+    - name: synced_count
+      description: "Number of successful syncs"
+      agg: count
+      expr: CASE WHEN sync_status = 'synced' THEN 1 ELSE NULL END
+    
+    - name: failed_count
+      description: "Number of failed syncs"
+      agg: count
+      expr: CASE WHEN sync_status = 'failed' THEN 1 ELSE NULL END
+    
+    - name: pending_count
+      description: "Number of pending syncs"
+      agg: count
+      expr: CASE WHEN sync_status = 'pending' THEN 1 ELSE NULL END
+    
+    - name: sync_success_rate
+      description: "Sync success rate (%)"
+      agg: average
+      expr: CASE WHEN sync_status = 'synced' THEN 100 ELSE 0 END
+    
+    - name: avg_retry_count
+      description: "Average number of retries"
+      agg: average
+      expr: retry_count

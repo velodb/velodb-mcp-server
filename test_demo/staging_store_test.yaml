@@ -1,0 +1,53 @@
+semantic_model:
+  name: staging_store_test
+  description: "File staging area; records pending file change operations (CREATE/UPDATE/DELETE/RENAME)"
+  db_table: system_mcp.staging_store_test
+  defaults:                        
+    agg_time_dimension: updated_at
+  
+  entities:
+    - name: filename
+      type: primary
+      expr: filename
+  
+  dimensions:
+    - name: filename
+      type: categorical
+      expr: filename
+    
+    - name: action
+      type: categorical
+      expr: action
+    
+    - name: updated_at
+      type: time
+      type_params:
+        time_granularity: day
+      expr: updated_at
+
+  measures:
+    - name: file_count
+      description: "Total number of files in the staging area"
+      agg: count
+      expr: filename
+    
+    - name: create_count
+      description: "Number of files with CREATE operations"
+      agg: count
+      expr: CASE WHEN action = 'CREATE' THEN 1 ELSE NULL END
+    
+    - name: update_count
+      description: "Number of files with UPDATE operations"
+      agg: count
+      expr: CASE WHEN action = 'UPDATE' THEN 1 ELSE NULL END
+    
+    - name: delete_count
+      description: "Number of files with DELETE operations"
+      agg: count
+      expr: CASE WHEN action = 'DELETE' THEN 1 ELSE NULL END
+    
+    - name: rename_count
+      description: "Number of files with RENAME operations"
+      agg: count
+      expr: CASE WHEN action = 'RENAME' THEN 1 ELSE NULL END
+      
