@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Doris MCP Documentation</title>
+  <title>VeloDB MCP Documentation</title>
   <style>
 :root {
   --bg: #fff;
@@ -232,10 +232,10 @@ body { padding-top: 64px; }
   </style>
 </head>
 <body>
-<nav class="top-tabs" role="tablist" aria-label="Doris MCP Documentation">
+<nav class="top-tabs" role="tablist" aria-label="VeloDB MCP Documentation">
   <div class="tab-inner">
-    <button id="tab-semantic" class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="panel-semantic" data-tab="semantic">Doris MCP Semantic Models</button>
-    <button id="tab-server" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-server" data-tab="server">Doris MCP User Guide</button>
+    <button id="tab-semantic" class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="panel-semantic" data-tab="semantic">VeloDB MCP Semantic Models</button>
+    <button id="tab-server" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-server" data-tab="server">VeloDB MCP User Guide</button>
   </div>
 </nav>
 
@@ -246,7 +246,7 @@ body { padding-top: 64px; }
 
 <section id="panel-semantic" class="doc-panel active" role="tabpanel" aria-labelledby="tab-semantic">
 <header>
-  <h1>Doris MCP Semantic Models</h1>
+  <h1>VeloDB MCP Semantic Models</h1>
   <p>MetricFlow v0.209.0 — the complete specification from YAML definitions to SQL queries</p>
 </header>
 <div class="container">
@@ -270,7 +270,7 @@ body { padding-top: 64px; }
     <li><a href="#advanced-features">Advanced features</a></li>
     <li><a href="#best-practices">Best practices</a></li>
     <li><a href="#errors">Common errors &amp; troubleshooting</a></li>
-    <li><a href="#doris-mcp">Semantic model management in doris-mcp</a></li>
+    <li><a href="#velodb-mcp">Semantic model management in velodb-mcp</a></li>
     <li><a href="#webui-cli">Usage: WebUI &amp; CLI</a></li>
   </ol>
 </div>
@@ -303,7 +303,7 @@ body { padding-top: 64px; }
 <span class="kw">---</span>
 <span class="kw">semantic_model:</span>
   <span class="kw">name:</span> <span class="str">orders</span>                         <span class="cmt"># Model name</span>
-  <span class="kw">db_table:</span> <span class="str">dw.orders</span>                    <span class="cmt"># Corresponding Doris table</span>
+  <span class="kw">db_table:</span> <span class="str">dw.orders</span>                    <span class="cmt"># Corresponding VeloDB table</span>
   <span class="kw">defaults:</span>
     <span class="kw">agg_time_dimension:</span> <span class="str">order_date</span>    <span class="cmt"># Default time dimension</span>
 
@@ -366,7 +366,7 @@ body { padding-top: 64px; }
   <table>
     <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
     <tr><td><code>name</code></td><td>string</td><td>✅</td><td>Globally unique model name. Starts with a lowercase letter; may contain digits and underscores</td></tr>
-    <tr><td><code>db_table</code></td><td>string</td><td>✅</td><td>Doris physical table. Format: <code>database.table</code>, e.g. <code>dw.orders</code></td></tr>
+    <tr><td><code>db_table</code></td><td>string</td><td>✅</td><td>VeloDB physical table. Format: <code>database.table</code>, e.g. <code>dw.orders</code></td></tr>
     <tr><td><code>defaults</code></td><td>object</td><td>✅</td><td>Default configuration. Must currently include <code>agg_time_dimension</code></td></tr>
     <tr><td><code>entities</code></td><td>list</td><td>✅</td><td>Entity definitions for the table. Must include at least one <code>type: primary</code> entity</td></tr>
     <tr><td><code>dimensions</code></td><td>list</td><td>✅</td><td>Dimensions available for grouping and filtering</td></tr>
@@ -1265,15 +1265,15 @@ body { padding-top: 64px; }
 <div class="box box-info" style="margin-top:24px;">
   <strong>🔍 Quick troubleshooting steps:</strong>
   <ol style="padding-left:20px; margin-top:8px;">
-    <li>Confirm the table exists in Doris: <code>DESCRIBE dw.orders</code></li>
+    <li>Confirm the table exists in VeloDB: <code>DESCRIBE dw.orders</code></li>
     <li>Confirm column names match exactly, including case</li>
     <li>Check YAML indentation (spaces only — no tabs)</li>
     <li>Confirm all names follow the lowercase-initial rule</li>
   </ol>
 </div>
 
-<!-- ════════════════ 13. DORIS-MCP MANAGEMENT ════════════════ -->
-<h2 id="doris-mcp">13. Semantic model management in doris-mcp</h2>
+<!-- ════════════════ 13. VELODB-MCP MANAGEMENT ════════════════ -->
+<h2 id="velodb-mcp">13. Semantic model management in velodb-mcp</h2>
 
 <div class="card">
   <h3 style="margin-top:0">13.1 Workspaces</h3>
@@ -1282,7 +1282,7 @@ body { padding-top: 64px; }
     <li>Model files (YAML definitions)</li>
     <li>Metric list (<code>list_metrics</code> only shows metrics in this workspace)</li>
     <li>Query engine instance (MetricFlow compiler)</li>
-    <li>Doris connection pool</li>
+    <li>VeloDB connection pool</li>
   </ul>
   <p>Metrics in workspace A are <strong>completely invisible</strong> to workspace B. Suitable for dividing by team, project, or environment.</p>
 
@@ -1415,7 +1415,7 @@ body { padding-top: 64px; }
 
   <table>
     <tr><th>Page</th><th>URL</th><th>Function</th></tr>
-    <tr><td>Login</td><td><code>/mcp/web/login</code></td><td>Log in with a Doris account (admin:admin is the default administrator)</td></tr>
+    <tr><td>Login</td><td><code>/mcp/web/login</code></td><td>Log in with a VeloDB account (admin:admin is the default administrator)</td></tr>
     <tr><td>Home</td><td><code>/mcp/web</code></td><td>Workspace list; switch, create, and delete workspaces</td></tr>
     <tr><td>Model management</td><td><code>/mcp/web/models?workspace=xxx</code></td><td>View Active and Staging file lists; edit, upload, delete</td></tr>
     <tr><td>File editor</td><td><code>/mcp/web/{filename}?workspace=xxx</code></td><td>Edit YAML files online</td></tr>
@@ -1434,48 +1434,48 @@ body { padding-top: 64px; }
 
 <div class="card">
   <h3 style="margin-top:0">14.2 CLI (command-line client)</h3>
-  <p>doris-mcp-client is an independently deployed command-line client that connects to the MCP Server via a Bearer token. All commands (tool + semantic) use Bearer authentication uniformly.</p>
+  <p>velodb-mcp-client is an independently deployed command-line client that connects to the MCP Server via a Bearer token. All commands (tool + semantic) use Bearer authentication uniformly.</p>
 
   <p><strong>MCP Tool calls:</strong></p>
 <pre><span class="cmt"># List all metrics</span>
-doris-mcp-client tool call list_metrics --json '{"workspace":"example"}'
+velodb-mcp-client tool call list_metrics --json '{"workspace":"example"}'
 
 <span class="cmt"># Query a metric (total order amount by month)</span>
-doris-mcp-client tool call query_metric --json \
+velodb-mcp-client tool call query_metric --json \
   '{"workspace":"example","metrics":["total_amount"],"group_by":["order_month"]}'
 
 <span class="cmt"># View the dimensions available for a metric</span>
-doris-mcp-client tool call list_dimensions_for_metric --json \
+velodb-mcp-client tool call list_dimensions_for_metric --json \
   '{"workspace":"example","metric_name":"total_amount"}'
 
 <span class="cmt"># Execute raw SQL</span>
-doris-mcp-client tool call execute_query --arg sql="SELECT * FROM dw.orders LIMIT 5"
+velodb-mcp-client tool call execute_query --arg sql="SELECT * FROM dw.orders LIMIT 5"
 
 <span class="cmt"># Health check + view all workspace states</span>
-doris-mcp-client tool call check_service_health
-doris-mcp-client semantic status</pre>
+velodb-mcp-client tool call check_service_health
+velodb-mcp-client semantic status</pre>
 
   <p><strong>Semantic model management:</strong></p>
 <pre><span class="cmt"># List all model files in a workspace</span>
-doris-mcp-client semantic list -w example
+velodb-mcp-client semantic list -w example
 
 <span class="cmt"># Upload YAML to staging</span>
-doris-mcp-client semantic push ./models -w example
+velodb-mcp-client semantic push ./models -w example
 
 <span class="cmt"># Pull the active models locally</span>
-doris-mcp-client semantic pull -o ./backup -w example
+velodb-mcp-client semantic pull -o ./backup -w example
 
 <span class="cmt"># Edit a model file online</span>
-doris-mcp-client semantic edit orders.yaml -w example
+velodb-mcp-client semantic edit orders.yaml -w example
 
 <span class="cmt"># Trigger a semantic layer reload</span>
-doris-mcp-client semantic reload -w example</pre>
+velodb-mcp-client semantic reload -w example</pre>
 
   <div class="box box-ok">
     <strong>🔌 MCP integration:</strong> add the following to your AI tool's configuration (e.g. Claude Desktop):
     <pre style="margin-top:8px;">{
   "mcpServers": {
-    "doris": {
+    "velodb": {
       "url": "http://&lt;server&gt;:&lt;port&gt;/mcp",
       "transport": "streamable-http",
       "headers": { "Authorization": "Bearer admin:admin" }
@@ -1487,14 +1487,14 @@ doris-mcp-client semantic reload -w example</pre>
 
 <!-- ════════════════ FOOTER ════════════════ -->
 <div style="text-align:center; margin-top:48px; padding:24px; color:var(--muted); font-size:.9rem; border-top:1px solid var(--border);">
-  <p>Based on MetricFlow v0.209.0 · Apache Doris adaptation · doris-mcp-server 0.2.0</p>
+  <p>Based on MetricFlow v0.209.0 · Apache VeloDB adaptation · velodb-mcp-server 0.2.0</p>
 </div>
 
 </div>
 </section>
 <section id="panel-server" class="doc-panel" role="tabpanel" aria-labelledby="tab-server">
 <header>
-  <h1>Doris MCP User Guide</h1>
+  <h1>VeloDB MCP User Guide</h1>
   <p>Connect AI agents (Claude Code / Codex), manage semantic models from the command line, and query data in natural language</p>
 </header>
 <div class="container">
@@ -1518,7 +1518,7 @@ doris-mcp-client semantic reload -w example</pre>
   </div>
 
 <blockquote>
-<p><strong>You are a Doris user</strong>. The administrator has already deployed the MCP Server for you. You only need to know:
+<p><strong>You are a VeloDB user</strong>. The administrator has already deployed the MCP Server for you. You only need to know:
 1. How to connect the service to an AI agent (Claude Code / Codex)
 2. How to manage semantic models with the CLI
 3. How to query data through AI conversations</p>
@@ -1530,14 +1530,14 @@ doris-mcp-client semantic reload -w example</pre>
   <p><strong>📋 Before you start — get these from your administrator:</strong></p>
   <ul style="padding-left:20px; margin:8px 0;">
     <li><strong>MCP Server address</strong>: <code>http://&lt;IP&gt;:&lt;port&gt;</code> (default port 3000)</li>
-    <li><strong>Doris username/password</strong>: for authentication (format <code>username:password</code>, e.g. <code>admin:admin</code>)</li>
+    <li><strong>VeloDB username/password</strong>: for authentication (format <code>username:password</code>, e.g. <code>admin:admin</code>)</li>
     <li><strong>Workspace name</strong>: the workspace holding the semantic models (default <code>example</code>)</li>
   </ul>
 </div>
 
 <h3>1.1 Connect Claude Code</h3>
 <p><strong>Step 1: Add the MCP Server</strong></p>
-<pre><code>claude mcp add --transport http doris http://&lt;MCP-Server-address&gt;:&lt;port&gt;/mcp \
+<pre><code>claude mcp add --transport http velodb http://&lt;MCP-Server-address&gt;:&lt;port&gt;/mcp \
   --header "Authorization: Bearer admin:admin"</code></pre>
 
 <p><strong>Step 2: Verify the connection</strong></p>
@@ -1545,7 +1545,7 @@ doris-mcp-client semantic reload -w example</pre>
 <blockquote>
 <p>check the service health status</p>
 </blockquote>
-<p>The AI will automatically call <code>check_service_health</code>, returning the Doris connection status and the state of all workspaces. If you see <code>"doris": "connected"</code>, the integration is successful.</p>
+<p>The AI will automatically call <code>check_service_health</code>, returning the VeloDB connection status and the state of all workspaces. If you see <code>"velodb": "connected"</code>, the integration is successful.</p>
 
 <p><strong>Step 3: Start querying</strong></p>
 <blockquote>
@@ -1557,7 +1557,7 @@ doris-mcp-client semantic reload -w example</pre>
 <p>Create <code>.cursor/mcp.json</code> in the project root or use VS Code's MCP configuration:</p>
 <pre><code>{
   "mcpServers": {
-    "doris": {
+    "velodb": {
       "url": "http://&lt;MCP-Server-address&gt;:&lt;port&gt;/mcp",
       "transport": "streamable-http",
       "headers": {
@@ -1581,7 +1581,7 @@ doris-mcp-client semantic reload -w example</pre>
 <tr>
   <td><code>check_service_health</code></td>
   <td>detail (optional)</td>
-  <td>Returns Doris connectivity + the state of each workspace (healthy / no_models / not_ready) and metric counts. Call it at the start of every conversation.</td>
+  <td>Returns VeloDB connectivity + the state of each workspace (healthy / no_models / not_ready) and metric counts. Call it at the start of every conversation.</td>
 </tr>
 </tbody>
 </table>
@@ -1655,7 +1655,7 @@ doris-mcp-client semantic reload -w example</pre>
   <p><strong>🔁 Standard flow for every conversation:</strong></p>
   <ol style="padding-left:20px; margin:12px 0;">
     <li><code>get_query_guide()</code> — get the full guide (the agent learns which tool to use when)</li>
-    <li><code>check_service_health()</code> — confirm Doris connectivity and view available workspaces</li>
+    <li><code>check_service_health()</code> — confirm VeloDB connectivity and view available workspaces</li>
     <li>
       <strong>Routing decision:</strong>
       <ul style="padding-left:16px; margin:4px 0;">
@@ -1698,86 +1698,86 @@ AI reply:
   MINI       298.00</code></pre>
 <hr />
 <h2 id="server-cli-tools">2. CLI command-line tool</h2>
-<p><code>doris-mcp-client</code> is the command-line client for the Doris MCP Server, used to call MCP tools and manage semantic models.</p>
+<p><code>velodb-mcp-client</code> is the command-line client for the VeloDB MCP Server, used to call MCP tools and manage semantic models.</p>
 
 <h3>2.1 Configure the connection</h3>
 <p>The CLI gets connection info from environment variables or a config file (pick one):</p>
 <p><strong>Option 1: Environment variables</strong></p>
-<pre><code>export DORIS_MCP_SERVER=http://&lt;MCP-Server-address&gt;:&lt;port&gt;
-export DORIS_MCP_TOKEN=admin:admin</code></pre>
-<p><strong>Option 2: Config file <code>doris-mcp-client.toml</code></strong></p>
+<pre><code>export VELODB_MCP_SERVER=http://&lt;MCP-Server-address&gt;:&lt;port&gt;
+export VELODB_MCP_TOKEN=admin:admin</code></pre>
+<p><strong>Option 2: Config file <code>velodb-mcp-client.toml</code></strong></p>
 <pre><code>[server]
-DORIS_MCP_SERVER = "http://&lt;MCP-Server-address&gt;:&lt;port&gt;"
-DORIS_MCP_TOKEN = "admin:admin"</code></pre>
+VELODB_MCP_SERVER = "http://&lt;MCP-Server-address&gt;:&lt;port&gt;"
+VELODB_MCP_TOKEN = "admin:admin"</code></pre>
 <p>You can also specify a config file path with <code>-c</code>:</p>
-<pre><code>doris-mcp-client -c /path/to/doris-mcp-client.toml tool list</code></pre>
+<pre><code>velodb-mcp-client -c /path/to/velodb-mcp-client.toml tool list</code></pre>
 
 <h3>2.2 Call MCP tools</h3>
 <pre><code># List all available tools
-doris-mcp-client tool list
+velodb-mcp-client tool list
 
 # Show a tool's parameters
-doris-mcp-client tool describe execute_query
+velodb-mcp-client tool describe execute_query
 
 # Call a tool: simple arguments
-doris-mcp-client tool call list_tables --arg database=analytics
+velodb-mcp-client tool call list_tables --arg database=analytics
 
 # Call a tool: JSON arguments
-doris-mcp-client tool call query_metric --json \
+velodb-mcp-client tool call query_metric --json \
   '{"workspace":"example","metrics":["total_amount"],"group_by":["channel"]}'
 
 # Check the service health status
-doris-mcp-client tool call check_service_health
+velodb-mcp-client tool call check_service_health
 
 # Verbose mode (shows detailed errors)
-doris-mcp-client -v tool call execute_query --arg sql="SELECT ..."</code></pre>
+velodb-mcp-client -v tool call execute_query --arg sql="SELECT ..."</code></pre>
 
 <h3>2.3 Semantic model management</h3>
 <pre><code># List all semantic files in a workspace
-doris-mcp-client semantic list --workspace example
+velodb-mcp-client semantic list --workspace example
 
 # View a file's content
-doris-mcp-client semantic view orders.yaml --workspace example
+velodb-mcp-client semantic view orders.yaml --workspace example
 
 # Upload and push semantic models
-doris-mcp-client semantic push ./models --workspace example
+velodb-mcp-client semantic push ./models --workspace example
 
 # Query a push result (async)
-doris-mcp-client semantic result &lt;request_id&gt;
+velodb-mcp-client semantic result &lt;request_id&gt;
 
 # Edit a semantic file (opens $EDITOR)
-doris-mcp-client semantic edit orders.yaml --workspace example
+velodb-mcp-client semantic edit orders.yaml --workspace example
 
 # Or pass the content directly
-doris-mcp-client semantic edit orders.yaml --content "..." --workspace example
+velodb-mcp-client semantic edit orders.yaml --content "..." --workspace example
 
 # Stage a file for deletion
-doris-mcp-client semantic delete old_model.yaml --workspace example
+velodb-mcp-client semantic delete old_model.yaml --workspace example
 
 # Trigger a semantic layer reload
-doris-mcp-client semantic reload --workspace example
+velodb-mcp-client semantic reload --workspace example
 
 # View the semantic layer status
-doris-mcp-client semantic status
+velodb-mcp-client semantic status
 
 # Pull the currently live semantic models locally
-doris-mcp-client semantic pull --output ./remote-models --workspace example</code></pre>
+velodb-mcp-client semantic pull --output ./remote-models --workspace example</code></pre>
 
 <h3>2.4 Quick command reference</h3>
 <table>
 <thead><tr><th>Command</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>doris-mcp-client tool list</code></td><td>List all MCP tools</td></tr>
-<tr><td><code>doris-mcp-client tool describe &lt;name&gt;</code></td><td>Show a tool's parameters</td></tr>
-<tr><td><code>doris-mcp-client tool call &lt;name&gt; --arg k=v</code></td><td>Call a tool (key-value arguments)</td></tr>
-<tr><td><code>doris-mcp-client tool call &lt;name&gt; --json '{...}'</code></td><td>Call a tool (JSON arguments)</td></tr>
-<tr><td><code>doris-mcp-client semantic list -w &lt;ws&gt;</code></td><td>List semantic files</td></tr>
-<tr><td><code>doris-mcp-client semantic push &lt;dir&gt; -w &lt;ws&gt;</code></td><td>Push semantic models</td></tr>
-<tr><td><code>doris-mcp-client semantic result &lt;id&gt;</code></td><td>Query a push result</td></tr>
-<tr><td><code>doris-mcp-client semantic edit &lt;file&gt; -w &lt;ws&gt;</code></td><td>Edit a semantic file</td></tr>
-<tr><td><code>doris-mcp-client semantic pull -o &lt;dir&gt; -w &lt;ws&gt;</code></td><td>Pull semantic models</td></tr>
-<tr><td><code>doris-mcp-client semantic status</code></td><td>Semantic layer status</td></tr>
-<tr><td><code>doris-mcp-client semantic reload -w &lt;ws&gt;</code></td><td>Trigger a reload</td></tr>
+<tr><td><code>velodb-mcp-client tool list</code></td><td>List all MCP tools</td></tr>
+<tr><td><code>velodb-mcp-client tool describe &lt;name&gt;</code></td><td>Show a tool's parameters</td></tr>
+<tr><td><code>velodb-mcp-client tool call &lt;name&gt; --arg k=v</code></td><td>Call a tool (key-value arguments)</td></tr>
+<tr><td><code>velodb-mcp-client tool call &lt;name&gt; --json '{...}'</code></td><td>Call a tool (JSON arguments)</td></tr>
+<tr><td><code>velodb-mcp-client semantic list -w &lt;ws&gt;</code></td><td>List semantic files</td></tr>
+<tr><td><code>velodb-mcp-client semantic push &lt;dir&gt; -w &lt;ws&gt;</code></td><td>Push semantic models</td></tr>
+<tr><td><code>velodb-mcp-client semantic result &lt;id&gt;</code></td><td>Query a push result</td></tr>
+<tr><td><code>velodb-mcp-client semantic edit &lt;file&gt; -w &lt;ws&gt;</code></td><td>Edit a semantic file</td></tr>
+<tr><td><code>velodb-mcp-client semantic pull -o &lt;dir&gt; -w &lt;ws&gt;</code></td><td>Pull semantic models</td></tr>
+<tr><td><code>velodb-mcp-client semantic status</code></td><td>Semantic layer status</td></tr>
+<tr><td><code>velodb-mcp-client semantic reload -w &lt;ws&gt;</code></td><td>Trigger a reload</td></tr>
 </tbody>
 </table>
 
@@ -1806,7 +1806,7 @@ doris-mcp-client semantic pull --output ./remote-models --workspace example</cod
 <p><code>execute_query</code> only allows read-only SQL (SELECT / SHOW / DESCRIBE / EXPLAIN).</p>
 
 <h3>3.3 Semantic layer queries (requires the admin to have configured semantic models)</h3>
-<p>If your Doris cluster has a semantic layer configured, the agent completes a query in three steps:</p>
+<p>If your VeloDB cluster has a semantic layer configured, the agent completes a query in three steps:</p>
 <ol>
   <li><code>list_metrics</code> — list all available metrics (name + description)</li>
   <li><code>list_dimensions_for_metric</code> — view the metric's available dimensions (name + type + description)</li>
@@ -1887,8 +1887,8 @@ AI: [calls list_dimensions_for_metric] → channel
 
 <h3>Q: Which metrics can the semantic layer use?</h3>
 <p>Check quickly with the CLI:</p>
-<pre><code>doris-mcp-client tool call list_metrics --json '{"workspace":"example"}'
-doris-mcp-client tool call check_service_health</code></pre>
+<pre><code>velodb-mcp-client tool call list_metrics --json '{"workspace":"example"}'
+velodb-mcp-client tool call check_service_health</code></pre>
 </div>
 </section>
 

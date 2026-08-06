@@ -1,10 +1,10 @@
-# Test Cases — doris-new-mcp
+# Test Cases — velodb-mcp-server
 
-Generated from [DESIGN.md](../DESIGN.md), [INSTALL.html](../INSTALL.html), and [doris-mcp-docs.html](../doris-mcp-docs.html).
+Generated from [DESIGN.md](../DESIGN.md), [INSTALL.html](../INSTALL.html), and [velodb-mcp-docs.html](../velodb-mcp-docs.html).
 
 ## File Overview
 
-### Offline unit tests (no MCP Server / Doris required)
+### Offline unit tests (no MCP Server / VeloDB required)
 
 | File | Contents |
 |------|----------|
@@ -22,7 +22,7 @@ Generated from [DESIGN.md](../DESIGN.md), [INSTALL.html](../INSTALL.html), and [
 | `test_session_affinity_proxy_relogin.py` | Session-affinity proxy re-login |
 | `test_session_affinity_proxy_force_target.py` | Session-affinity proxy request-address routing |
 
-### Online tests (require a running MCP Server + Doris)
+### Online tests (require a running MCP Server + VeloDB)
 
 | File | Contents |
 |------|----------|
@@ -40,7 +40,7 @@ Generated from [DESIGN.md](../DESIGN.md), [INSTALL.html](../INSTALL.html), and [
 | Requirement | Notes |
 |-------------|-------|
 | MCP Server | Running at `localhost:3000` (online tests only) |
-| Doris FE | Running at `127.0.0.1:9030` (online tests only) |
+| VeloDB FE | Running at `127.0.0.1:9030` (online tests only) |
 | Authentication | `admin:admin` |
 | Python | 3.10+; offline tests use the project `.venv` (`PYTHONPATH=src`) |
 
@@ -50,9 +50,9 @@ export MCP_URL=http://192.168.1.100:3000/mcp
 export MCP_BASE_URL=http://192.168.1.100:3000
 export MCP_TOKEN=admin:admin
 export MCP_WORKSPACE=example
-export DORIS_USER=admin          # test_web_api.py login credentials
-export DORIS_PASS=admin
-export DORIS_MCP_TEST_DESTRUCTIVE=1  # enable destructive cases (see below)
+export VELODB_USER=admin          # test_web_api.py login credentials
+export VELODB_PASS=admin
+export VELODB_MCP_TEST_DESTRUCTIVE=1  # enable destructive cases (see below)
 ```
 
 ## How to Run
@@ -87,7 +87,7 @@ python test/test_web_api.py
 ## Destructive Cases
 
 The following cases in `test_web_api.py` affect shared server state and are
-**skipped by default**; they only run when `DORIS_MCP_TEST_DESTRUCTIVE=1` is
+**skipped by default**; they only run when `VELODB_MCP_TEST_DESTRUCTIVE=1` is
 set explicitly:
 
 - `test_api_staging_discard` — discards real users' staged changes
@@ -100,7 +100,7 @@ set explicitly:
 | Tool | Scenarios | Assertions |
 |------|-----------|------------|
 | `get_query_guide` | Get the workflow guide | Returned text >100 chars, contains keywords |
-| `check_service_health` | Basic/detailed | Doris=connected, workspaces present |
+| `check_service_health` | Basic/detailed | VeloDB=connected, workspaces present |
 | `list_metrics` | List/pagination | data array, meta.total_count |
 | `list_dimensions_for_metric` | Dimensions by metric | data contains dimensions |
 | `query_metric` | Basic/group_by/where/order+limit | 4 query modes |

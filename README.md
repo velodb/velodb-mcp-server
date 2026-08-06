@@ -17,18 +17,18 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Doris MCP Server
+# VeloDB MCP Server
 
-Doris MCP Server is a backend service that exposes [Apache Doris](https://doris.apache.org/) through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). AI clients (Claude Desktop, Cursor, VS Code, and others) can query Doris data through a governed **semantic metrics layer** built on [MetricFlow](https://github.com/dbt-labs/metricflow), with raw-SQL discovery as a fallback path. It ships with a Web UI for managing semantic models and a CLI client for scripting.
+VeloDB MCP Server is a backend service that exposes [Apache VeloDB](https://velodb.apache.org/) through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). AI clients (Claude Desktop, Cursor, VS Code, and others) can query VeloDB data through a governed **semantic metrics layer** built on [MetricFlow](https://github.com/dbt-labs/metricflow), with raw-SQL discovery as a fallback path. It ships with a Web UI for managing semantic models and a CLI client for scripting.
 
 ## Core Features
 
 *   **Semantic Metrics Layer**: Define metrics once in YAML (simple / ratio / derived / cumulative / conversion), query them from any MCP client. MetricFlow compiles semantically correct SQL — no hand-written aggregation queries.
-*   **Multi-Workspace Isolation**: Fully isolated tenants with their own models, compiler, and Doris storage tables. Models are stored in Doris itself (`active` + `staging` tables), so multiple server nodes share state without file sync.
+*   **Multi-Workspace Isolation**: Fully isolated tenants with their own models, compiler, and VeloDB storage tables. Models are stored in VeloDB itself (`active` + `staging` tables), so multiple server nodes share state without file sync.
 *   **Staging Workflow**: All model changes go through *staging → validate → commit*; broken models can never affect running queries.
 *   **Guided Tooling**: 10 MCP tools with an enforced workflow (`get_query_guide` → `check_service_health` → semantic query, or metadata discovery → raw SQL fallback).
-*   **Credential Pass-Through**: `Authorization: Bearer <doris-user>:<password>` — every query runs under the caller's own Doris identity with per-user connection pools. No shared admin credentials.
-*   **Web UI**: Login with Doris credentials to edit/validate/publish models, manage workspaces, and deploy the bundled example — no YAML tooling required.
+*   **Credential Pass-Through**: `Authorization: Bearer <velodb-user>:<password>` — every query runs under the caller's own VeloDB identity with per-user connection pools. No shared admin credentials.
+*   **Web UI**: Login with VeloDB credentials to edit/validate/publish models, manage workspaces, and deploy the bundled example — no YAML tooling required.
 *   **CLI Client**: `mcp-client` for calling tools and pushing/pulling model files from scripts and CI/CD.
 *   **Multi-Node Ready**: Session affinity is handled in-app using the server IP recorded in the Web UI cookie; nginx stays a plain reverse proxy.
 *   **Self-Contained Packaging**: Release tarballs bundle a Python 3.10 runtime and all dependencies. No network, no pip, no system Python required on target machines.
@@ -36,7 +36,7 @@ Doris MCP Server is a backend service that exposes [Apache Doris](https://doris.
 ## System Requirements
 
 *   **Server host**: Linux x86_64 or ARM64 (for running the release package)
-*   **Database**: Apache Doris FE reachable via MySQL protocol (default `127.0.0.1:9030`)
+*   **Database**: Apache VeloDB FE reachable via MySQL protocol (default `127.0.0.1:9030`)
 *   **Building from source**: curl/wget, or a local Python 3.10.x for offline builds
 
 ## 🚀 Quick Start
@@ -46,15 +46,15 @@ Doris MCP Server is a backend service that exposes [Apache Doris](https://doris.
 Download the latest release from [Releases](../../releases):
 
 ```bash
-tar xzf doris-mcp-server-<version>-linux-x64.tar.gz
-cd doris-mcp-server
+tar xzf velodb-mcp-server-<version>-linux-x64.tar.gz
+cd velodb-mcp-server
 ```
 
 Or build from source (see [Building from Source](#building-from-source)).
 
 ### 2. Start the server
 
-The default points to a same-host Doris FE (`127.0.0.1:9030`). For a separate deployment, set `server.fe_host` to the FE private IP or hostname, then:
+The default points to a same-host VeloDB FE (`127.0.0.1:9030`). For a separate deployment, set `server.fe_host` to the FE private IP or hostname, then:
 
 ```bash
 # Foreground
@@ -68,16 +68,16 @@ The server listens on port **3000** by default.
 
 ### 3. Connect your MCP client
 
-Authentication is your **Doris username and password** passed as a Bearer token:
+Authentication is your **VeloDB username and password** passed as a Bearer token:
 
 ```text
-Authorization: Bearer <doris-user>:<doris-password>
+Authorization: Bearer <velodb-user>:<velodb-password>
 ```
 
 **Claude Desktop / Claude Code:**
 
 ```bash
-claude mcp add --transport http doris http://<host>:3000/mcp \
+claude mcp add --transport http velodb http://<host>:3000/mcp \
   --header "Authorization: Bearer <user>:<password>"
 ```
 
@@ -86,7 +86,7 @@ claude mcp add --transport http doris http://<host>:3000/mcp \
 ```json
 {
   "mcpServers": {
-    "doris": {
+    "velodb": {
       "type": "http",
       "url": "http://<host>:3000/mcp",
       "headers": {
@@ -108,7 +108,7 @@ fastmcp call http://<host>:3000/mcp check_service_health \
 
 ### 4. Deploy the example workspace (Web UI)
 
-1. Open `http://<host>:3000/mcp/web` and log in with your Doris credentials (management operations require the Doris `admin` user).
+1. Open `http://<host>:3000/mcp/web` and log in with your VeloDB credentials (management operations require the VeloDB `admin` user).
 2. Click the **example deploy** button. Deployment runs in the background; the page polls progress and redirects when done.
 3. Back in your AI client, ask: *"What is the total order amount by channel?"* — the agent will discover the `example` workspace and query metrics like `total_amount` grouped by `channel`.
 
@@ -119,8 +119,8 @@ fastmcp call http://<host>:3000/mcp check_service_health \
 **CLI client:**
 
 ```bash
-export DORIS_MCP_SERVER=http://<host>:3000
-export DORIS_MCP_TOKEN=<user>:<password>
+export VELODB_MCP_SERVER=http://<host>:3000
+export VELODB_MCP_TOKEN=<user>:<password>
 
 ./mcp-client.sh semantic push ./models -w my_workspace
 ./mcp-client.sh semantic pull -o ./backup -w my_workspace
@@ -131,7 +131,7 @@ export DORIS_MCP_TOKEN=<user>:<password>
 
 ```
 get_query_guide()              ← 1. workflow instructions (always first)
-check_service_health()         ← 2. Doris connectivity + workspace status
+check_service_health()         ← 2. VeloDB connectivity + workspace status
     │
     ├─ semantic layer healthy ─→ list_metrics → list_dimensions_for_metric → query_metric
     │                             (counts, sums, ratios, rankings, trends)
@@ -144,7 +144,7 @@ check_service_health()         ← 2. Doris connectivity + workspace status
 | Key | Default | Description |
 |-----|---------|-------------|
 | `server.mcp_host` / `server.mcp_port` | `0.0.0.0` / `3000` | HTTP listen address |
-| `server.fe_host` / `server.fe_port` | `127.0.0.1` / `9030` | Doris FE endpoint; set a private IP or hostname for remote FE deployment |
+| `server.fe_host` / `server.fe_port` | `127.0.0.1` / `9030` | VeloDB FE endpoint; set a private IP or hostname for remote FE deployment |
 | `query.db_whitelist` | `[]` | Optional database allow-list |
 | `query.query_timeout_seconds` | `600` | SQL query timeout |
 | `query.query_max_rows` | `10000` | Max rows per query |
@@ -167,10 +167,10 @@ Multiple server nodes behind one load balancer work without an affinity configur
 The build downloads a standalone Python 3.10 and produces a self-contained tarball in `dist/`. If GitHub is unreachable, point to a local Python 3.10:
 
 ```bash
-DORIS_MCP_SYSTEM_PYTHON=/opt/miniconda3/bin/python ./build.sh linux-x64
+VELODB_MCP_SYSTEM_PYTHON=/opt/miniconda3/bin/python ./build.sh linux-x64
 ```
 
-**CI releases** (`.github/workflows/release.yml`): pushing a tag named `doris-mcp-server-x.y.z` builds linux-x64 + linux-arm64 packages and publishes a GitHub Release for that version. A release can also be triggered manually from the Actions page.
+**CI releases** (`.github/workflows/release.yml`): pushing a tag named `velodb-mcp-server-x.y.z` builds linux-x64 + linux-arm64 packages and publishes a GitHub Release for that version. A release can also be triggered manually from the Actions page.
 
 ## Running Tests
 
@@ -184,7 +184,7 @@ bash test/run_all_tests.sh             # full suite (needs a local server)
 
 *   [DESIGN.md](DESIGN.md) — architecture and design decisions
 *   [INSTALL.html](INSTALL.html) — installation guide
-*   [doris-mcp-docs.html](doris-mcp-docs.html) — semantic model reference and user guide
+*   [velodb-mcp-docs.html](velodb-mcp-docs.html) — semantic model reference and user guide
 
 ## License
 

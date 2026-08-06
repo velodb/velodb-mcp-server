@@ -1,8 +1,8 @@
-# DESIGN.md — doris-mcp-server Design Document
+# DESIGN.md — velodb-mcp-server Design Document
 
 ## Overview
 
-**doris-mcp-server** is an Apache Doris query service based on the MCP (Model Context Protocol). It exposes Doris data query capabilities through FastMCP's streamable-http transport, ships with a semantic metrics layer built on MetricFlow v0.209.0, supports multi-workspace isolation, and provides both a Web UI and a CLI for administration.
+**velodb-mcp-server** is an Apache VeloDB query service based on the MCP (Model Context Protocol). It exposes VeloDB data query capabilities through FastMCP's streamable-http transport, ships with a semantic metrics layer built on MetricFlow v0.209.0, supports multi-workspace isolation, and provides both a Web UI and a CLI for administration.
 
 ```
                      MCP protocol (streamable-http, stateless)
@@ -22,7 +22,7 @@
 │          │                 │                       │              │
 │  ┌───────┴─────────────────┴───────────────────────┴────────────┐ │
 │  │                    Authentication layer                      │ │
-│  │  MCP:  Bearer username:password → CredentialVerifier → Doris │ │
+│  │  MCP:  Bearer username:password → CredentialVerifier → VeloDB │ │
 │  │  Web:  session cookie <session_id>.<node-IP> (24h TTL,       │ │
 │  │        httponly)                                             │ │
 │  │  Cache: 10-minute in-memory credential cache; login          │ │
@@ -41,7 +41,7 @@
                                │ pymysql / aiomysql
                                ▼
                     ┌─────────────────────┐
-                    │   Apache Doris FE   │
+                    │   Apache VeloDB FE   │
                     │   127.0.0.1:9030    │
                     │                     │
                     │  system_mcp.*       │  ← workspace storage
@@ -63,7 +63,7 @@ main()
   └─ create_server()
        ├─ MultiWorkspaceWatcher         ← lazy init: scans workspaces on first authenticated request
        ├─ PoolManager                   ← per-user aiomysql pool factory (no shared admin pool)
-       ├─ CredentialVerifier            ← Bearer token → Doris credential verification (10-min cache)
+       ├─ CredentialVerifier            ← Bearer token → VeloDB credential verification (10-min cache)
        ├─ Register 10 MCP Tools
        ├─ Register Web UI routes (/mcp/web/*)
        └─ Register REST API routes (/mcp/web/semantic/*, /mcp/web/staging/*)
@@ -88,10 +88,10 @@ The `lifespan` context manager releases all connection pools when the server shu
 
 ```toml
 [server]
-mcp_name = "doris-new-mcp"      # MCP server name
+mcp_name = "velodb-mcp-server"      # MCP server name
 mcp_host = "0.0.0.0"            # Listen address
 mcp_port = 3000                 # HTTP port
-fe_port = 9030                  # Doris FE MySQL port (same-host 127.0.0.1)
+fe_port = 9030                  # VeloDB FE MySQL port (same-host 127.0.0.1)
 
 [logging]
 level = "info"                  # debug|info|warning|error
@@ -114,7 +114,7 @@ query_max_rows = 10000           # Default maximum rows returned
 |-------|----------------|
 | `AppConfig` | Top level; loads TOML/YAML; regex-replaces `${VAR}` environment variables |
 | `McpConfig` | Server name, address/port, logging config, seed switch |
-| `ClusterConfig` | Doris FE connection, pool parameters, query limits, database allow-list |
+| `ClusterConfig` | VeloDB FE connection, pool parameters, query limits, database allow-list |
 
 ---
 
@@ -125,11 +125,11 @@ query_max_rows = 10000           # Default maximum rows returned
 | # | Tool | Annotations | Purpose |
 |---|------|-------------|---------|
 | 1 | `get_query_guide` | read-only, idempotent | **Mandatory first call.** Returns the full workflow guide telling the AI when to use the semantic layer vs. raw SQL, and the tool call order. |
-| 2 | `check_service_health` | read-only, idempotent | **Mandatory second call.** Doris connectivity + per-workspace status + metric counts. |
+| 2 | `check_service_health` | read-only, idempotent | **Mandatory second call.** VeloDB connectivity + per-workspace status + metric counts. |
 | 3 | `list_metrics` | read-only, idempotent | Lists all metrics (name + description) in a workspace. |
 | 4 | `list_dimensions_for_metric` | read-only, idempotent | Returns the available `group_by` dimensions for a metric. |
 | 5 | `query_metric` | read-only | **Core query tool.** MetricFlow compile → execute SQL. Supports `metrics`/`group_by`/`where`/`order_by`/`limit`/`having`/`database`/`max_rows`. |
-| 6 | `list_databases` | read-only, idempotent | Lists Doris databases (paginated). |
+| 6 | `list_databases` | read-only, idempotent | Lists VeloDB databases (paginated). |
 | 7 | `list_tables` | read-only, idempotent | Lists tables in a database (supports `like` fuzzy match, paginated). |
 | 8 | `describe_table` | read-only, idempotent | Table structure (`names`/`summary`/`full` detail levels). |
 | 9 | `execute_query` | read-only | Raw SQL fallback path (only SELECT/SHOW/DESCRIBE/EXPLAIN allowed). |
@@ -142,7 +142,7 @@ The system enforces a strict call order on AI clients:
 ```
 get_query_guide()                    ← Step 1: get the workflow guide
     ↓
-check_service_health()               ← Step 2: check Doris and workspace status
+check_service_health()               ← Step 2: check VeloDB and workspace status
     ↓
     ├─ Semantic layer healthy? ──→ list_metrics() → list_dimensions_for_metric() → query_metric()
     │                      (normal path: counts, sums, ratios, rankings, trends)
@@ -186,17 +186,17 @@ Authorization: Bearer username:password
 |------|-----------|--------|
 | 1 | `CredentialVerifier.verify_token()` | Splits username and password at the first `:` |
 | 2 | `CredentialCache` | Checks the 10-minute TTL in-memory cache |
-| 3 | `pymysql.connect(host=<fe_host>, user, password)` | Verifies credentials against the configured Doris FE |
+| 3 | `pymysql.connect(host=<fe_host>, user, password)` | Verifies credentials against the configured VeloDB FE |
 | 4 | Valid → cache → return `AccessToken` | |
 | 5 | Invalid → return 401 | |
 
-Verification uses the machine's **real, non-127.0.0.1 IP** (discovered via a UDP connect to 8.8.8.8), ensuring Doris applies the real user identity.
+Verification uses the machine's **real, non-127.0.0.1 IP** (discovered via a UDP connect to 8.8.8.8), ensuring VeloDB applies the real user identity.
 
 ### 4.2 Web UI authentication
 
 ```
 GET  /mcp/web/login  → render the login form
-POST /mcp/web/login  → verify Doris credentials → set the "doris_mcp_session" cookie
+POST /mcp/web/login  → verify VeloDB credentials → set the "velodb_mcp_session" cookie
                        format: <session_id>.<node-IP> (24h TTL, httponly, samesite=lax)
 GET  /mcp/web/logout → clear the session and cookie
 ```
@@ -209,13 +209,13 @@ GET  /mcp/web/logout → clear the session and cookie
 
 | Role | Determined by | Permissions |
 |------|---------------|-------------|
-| **admin** | Doris username is exactly `admin` | Everything: upload/pull/validate/commit/discard models, create/delete workspaces, deploy/remove the example, execute arbitrary SQL |
+| **admin** | VeloDB username is exactly `admin` | Everything: upload/pull/validate/commit/discard models, create/delete workspaces, deploy/remove the example, execute arbitrary SQL |
 | **Authenticated user** | Valid Bearer token, via `_check_semantic_access()` | Read-only: view models, list/query metrics, execute SQL (read-only validated) |
 | **Unauthenticated** | No token | Denied (401 or redirect to the login page) |
 
 ### 4.4 Per-user connection pools
 
-Each authenticated user gets an independent `aiomysql` connection pool, connecting via the machine's non-loopback IP. This ensures Doris applies user-level authorization correctly. When authentication fails, the credential cache is cleared automatically and the next request re-verifies.
+Each authenticated user gets an independent `aiomysql` connection pool, connecting via the machine's non-loopback IP. This ensures VeloDB applies user-level authorization correctly. When authentication fails, the credential cache is cleared automatically and the next request re-verifies.
 
 ---
 
@@ -228,7 +228,7 @@ A **workspace** is a fully isolated logical tenant containing:
 - Independent YAML model files
 - An independent MetricFlow compiler instance
 - An independent metric namespace
-- Independent Doris storage tables
+- Independent VeloDB storage tables
 
 Metrics in workspace A are **completely invisible** to workspace B.
 
@@ -250,7 +250,7 @@ Metrics in workspace A are **completely invisible** to workspace B.
 
 ### 5.3 Storage architecture (`src/store/store.py`)
 
-Each workspace has **two** Doris tables in the `system_mcp` database:
+Each workspace has **two** VeloDB tables in the `system_mcp` database:
 
 ```
 system_mcp.active_store_{workspace}     ← live models (read-only)
@@ -330,7 +330,7 @@ MultiWorkspaceWatcher
 ### 6.1 MetricFlow integration (`src/store/compiler.py`)
 
 ```
-YAML models (stored in the Doris active_store)
+YAML models (stored in the VeloDB active_store)
       │
       ▼
   bootstrap()          ← MetricFlow build (dbt parsing + manifest generation)
@@ -343,11 +343,11 @@ YAML models (stored in the Doris active_store)
       └── MetricFlowCompiler
             │
             ├── MetricFlowEngine (compile-only mode)
-            │     └── _DorisSqlClientStub  ← satisfies the SqlClient interface
+            │     └── _VeloDBSqlClientStub  ← satisfies the SqlClient interface
             │           used for dialect rendering only; executes no real queries
             │
             └── query_metric() flow:
-                  explain(sql) → Doris SQL → ConnectionPool.execute(sql) → rows
+                  explain(sql) → VeloDB SQL → ConnectionPool.execute(sql) → rows
 ```
 
 ### 6.2 Semantic model structure
@@ -357,7 +357,7 @@ A `semantic_model` YAML document contains:
 | Field | Required | Description |
 |-------|:--:|------|
 | `name` | ✅ | Globally unique model name |
-| `db_table` | ✅ | Doris physical table (`database.table`) |
+| `db_table` | ✅ | VeloDB physical table (`database.table`) |
 | `defaults.agg_time_dimension` | ✅ | Default time dimension for metrics |
 | `entities` | ✅ | Primary/foreign/unique/natural keys |
 | `dimensions` | ✅ | Time dimensions (day/week/month/quarter/year/hour/minute) and categorical dimensions |
@@ -405,7 +405,7 @@ ConnectionPool
 |------|------|---------|---------|
 | Per-user pool | `<authenticated user>` | 0/10 | Execute SQL queries as the user |
 
-**No shared admin pool:** all Doris connections use the credentials carried by the request (Bearer token or the username/password in the Web UI session); pools for the same user are reused across requests via `PoolManager`. Idle connections are reclaimed per `pool_idle_timeout_seconds`; invalid credentials are automatically evicted from the cache and rebuilt.
+**No shared admin pool:** all VeloDB connections use the credentials carried by the request (Bearer token or the username/password in the Web UI session); pools for the same user are reused across requests via `PoolManager`. Idle connections are reclaimed per `pool_idle_timeout_seconds`; invalid credentials are automatically evicted from the cache and rebuilt.
 
 ---
 
@@ -454,33 +454,33 @@ When multiple MCP Server nodes sit behind one domain (ALB), Web UI sessions are 
 
 **Subsequent routing:** when a request lands on a different node, the middleware parses the cookie suffix IP and forwards via httpx to the node holding the session; when it lands on the node named by the cookie, it is handled locally. The `/mcp` protocol is unaffected and remains node-local.
 
-**Forwarding implementation notes:** shared httpx.AsyncClient (Set-Cookie disabled, no redirect following, trust_env=False); streaming forwarding of request/response bodies; internal hop header `x-doris-session-affinity-hop` prevents forwarding loops; on upstream timeout/unreachable, the cookie is cleared and the client gets a 303 back to the login page.
+**Forwarding implementation notes:** shared httpx.AsyncClient (Set-Cookie disabled, no redirect following, trust_env=False); streaming forwarding of request/response bodies; internal hop header `x-velodb-session-affinity-hop` prevents forwarding loops; on upstream timeout/unreachable, the cookie is cleared and the client gets a 303 back to the login page.
 
 ---
 
 ## 9. CLI Client (`mcp-client/`)
 
-A standalone command-line client distributed as a separate tar.gz package. Connection is configured via environment variables or `doris-mcp-client.toml`:
+A standalone command-line client distributed as a separate tar.gz package. Connection is configured via environment variables or `velodb-mcp-client.toml`:
 
 ```bash
-export DORIS_MCP_SERVER=http://<host>:<port>
-export DORIS_MCP_TOKEN=admin:admin
+export VELODB_MCP_SERVER=http://<host>:<port>
+export VELODB_MCP_TOKEN=admin:admin
 ```
 
 **MCP Tool calls:**
 ```bash
-doris-mcp-client tool list
-doris-mcp-client tool call list_metrics --json '{"workspace":"example"}'
-doris-mcp-client tool call query_metric --json '{"metrics":["total_amount"],"group_by":["channel"]}'
+velodb-mcp-client tool list
+velodb-mcp-client tool call list_metrics --json '{"workspace":"example"}'
+velodb-mcp-client tool call query_metric --json '{"metrics":["total_amount"],"group_by":["channel"]}'
 ```
 
 **Semantic model management:**
 ```bash
-doris-mcp-client semantic push ./models -w example
-doris-mcp-client semantic pull -o ./backup -w example
-doris-mcp-client semantic list -w example
-doris-mcp-client semantic reload -w example
-doris-mcp-client semantic status
+velodb-mcp-client semantic push ./models -w example
+velodb-mcp-client semantic pull -o ./backup -w example
+velodb-mcp-client semantic list -w example
+velodb-mcp-client semantic reload -w example
+velodb-mcp-client semantic status
 ```
 
 ---
@@ -509,10 +509,10 @@ The example is not deployed automatically. An admin can deploy or remove it manu
 | Decision | Rationale |
 |----------|-----------|
 | `stateless_http=True` | No MCP session state is maintained. Compatible with clients that don't keep a session (VeloDB proxy, Claude Desktop). |
-| YAML stored in Doris | Model files live in Doris tables rather than the filesystem. Enables multi-server shared-state deployment without file sync. |
+| YAML stored in VeloDB | Model files live in VeloDB tables rather than the filesystem. Enables multi-server shared-state deployment without file sync. |
 | Two-level storage (active + staging) | Prevents broken models from affecting production. Enforces a "validate before commit" gate. |
-| Compile-only `_DorisSqlClientStub` | MetricFlow needs a SqlClient for dialect rendering; real queries execute through the aiomysql pool under the user's identity. |
-| Per-user connection pools | Each authenticated user gets an independent aiomysql pool, preserving Doris's native user-level authorization. |
+| Compile-only `_VeloDBSqlClientStub` | MetricFlow needs a SqlClient for dialect rendering; real queries execute through the aiomysql pool under the user's identity. |
+| Per-user connection pools | Each authenticated user gets an independent aiomysql pool, preserving VeloDB's native user-level authorization. |
 | Inline HTML templates | The Web UI has no external CDN dependencies; single-file deployment; works behind proxies/VPNs. |
 | Python 3.10 standalone build | Self-contained distribution via `python-build-standalone`. No system Python required at runtime. |
 | Audit log (timed rotation) | Every Tool call records client_id, parameters, duration, success/failure. Rotated daily, retained 30 days. Sensitive data (cookies, passwords, tokens) is masked before hitting disk. |
@@ -538,7 +538,7 @@ Downloads a standalone Python 3.10 distribution from `astral-sh/python-build-sta
 
 ```
 dist/
-└── doris-mcp-server-{version}-{platform}.tar.gz    ← python/ + src/ + config + mcp-client/
+└── velodb-mcp-server-{version}-{platform}.tar.gz    ← python/ + src/ + config + mcp-client/
 ```
 
 > The single source of truth for the version number is `pyproject.toml`; the `VERSION` environment variable of `build.sh` can override it (CI injects it from the Git tag).
@@ -548,37 +548,37 @@ dist/
 
 | Trigger | Behavior |
 |---------|----------|
-| Manually push a tag `doris-mcp-server-x.y.z` | Build at the tag version and publish a Release |
+| Manually push a tag `velodb-mcp-server-x.y.z` | Build at the tag version and publish a Release |
 | Manual trigger from Actions | Build at the input version and publish a Release |
 
 Each release produces linux-x64 and linux-arm64 packages (private repos have no free ARM runners; arm64 is cross-built on an x64 runner via `build.sh`):
 
 ```
-doris-mcp-server-0.2.3-linux-x64.tar.gz
-doris-mcp-server-0.2.3-linux-arm64.tar.gz
+velodb-mcp-server-0.2.3-linux-x64.tar.gz
+velodb-mcp-server-0.2.3-linux-arm64.tar.gz
 ```
 
-Both packages extract to the same top-level directory `doris-mcp-server/`, so deployment scripts need no changes.
+Both packages extract to the same top-level directory `velodb-mcp-server/`, so deployment scripts need no changes.
 
 ### 12.3 Deployment
 
 ```bash
 # 1. Extract
-tar xzf doris-mcp-server-{version}-linux-x64.tar.gz
-cd doris-mcp-server
+tar xzf velodb-mcp-server-{version}-linux-x64.tar.gz
+cd velodb-mcp-server
 
 # 2. Configure (optional; the default localhost:9030 works)
 vim mcp-server.toml
 
 # 3. Start
 ./start-mcp-server.sh                     # foreground
-nohup ./start-mcp-server.sh > /tmp/doris-mcp.log 2>&1 &   # background
+nohup ./start-mcp-server.sh > /tmp/velodb-mcp.log 2>&1 &   # background
 ```
 
-No network, no pip, and no system Python are required at runtime. The bundled Python can be overridden via the `DORIS_MCP_PYTHON` environment variable:
+No network, no pip, and no system Python are required at runtime. The bundled Python can be overridden via the `VELODB_MCP_PYTHON` environment variable:
 
 ```bash
-DORIS_MCP_PYTHON=/usr/bin/python3.10 ./start-mcp-server.sh
+VELODB_MCP_PYTHON=/usr/bin/python3.10 ./start-mcp-server.sh
 ```
 
 ### 12.4 Verification
@@ -588,7 +588,7 @@ DORIS_MCP_PYTHON=/usr/bin/python3.10 ./start-mcp-server.sh
 curl http://<IP>:3000/mcp/web
 
 # MCP agent integration
-claude mcp add --transport http doris http://<IP>:3000/mcp \
+claude mcp add --transport http velodb http://<IP>:3000/mcp \
   --header "Authorization: Bearer admin:admin"
 ```
 
@@ -597,14 +597,14 @@ claude mcp add --transport http doris http://<IP>:3000/mcp \
 ## 13. Directory Structure
 
 ```
-doris-mcp-server/
+velodb-mcp-server/
 ├── build.sh                     # build script
 ├── requirements.txt             # Python 3.10 dependencies
 ├── mcp-server.toml              # server configuration
 ├── start-mcp-server.sh          # startup script
 ├── mcp-client.sh                # client launcher script
 ├── INSTALL.html                 # installation guide
-├── doris-mcp-docs.html          # full documentation (semantic models + user guide)
+├── velodb-mcp-docs.html          # full documentation (semantic models + user guide)
 ├── DESIGN.md                    # this document
 ├── .github/workflows/
 │   └── release.yml              # CI: auto-release on PR merge / tag release (x64 + arm64)
@@ -613,7 +613,7 @@ doris-mcp-server/
 │   ├── server.py                # service factory, 10 Tools, Web UI routes, REST API
 │   ├── auth/                    # authentication module
 │   │   ├── credential_cache.py  # 10-minute TTL in-memory cache
-│   │   ├── credential_verifier.py # Bearer token → Doris verification
+│   │   ├── credential_verifier.py # Bearer token → VeloDB verification
 │   │   └── guard.py             # tool-level access control
 │   ├── config/
 │   │   └── loader.py            # TOML/YAML config + ${VAR} env interpolation
@@ -630,9 +630,9 @@ doris-mcp-server/
 │   │   ├── sensitive_mask.py    # sensitive data masking
 │   │   └── session_affinity_proxy.py # Web UI session-affinity ASGI reverse proxy (§8.3)
 │   ├── store/                   # workspace storage module
-│   │   ├── store.py             # DorisStore: per-workspace active/staging tables
+│   │   ├── store.py             # VeloDBStore: per-workspace active/staging tables
 │   │   ├── watcher.py           # MultiWorkspaceWatcher: poll, reload, validate, commit
-│   │   ├── compiler.py          # MetricFlowCompiler + _DorisSqlClientStub
+│   │   ├── compiler.py          # MetricFlowCompiler + _VeloDBSqlClientStub
 │   │   ├── manifest.py          # SemanticManifest: parse semantic_manifest.json
 │   │   ├── bootstrap.py         # MetricFlow build (dbt parsing + manifest generation)
 │   │   ├── seed.py              # example data seeding
@@ -643,7 +643,7 @@ doris-mcp-server/
 │   │   ├── query.py             # execute_query (SQL execution)
 │   │   └── semantic.py          # list_metrics, list_dimensions_for_metric, query_metric
 │   ├── skills/
-│   │   └── doris-mcp-skill.md   # query guide (returned by get_query_guide)
+│   │   └── velodb-mcp-skill.md   # query guide (returned by get_query_guide)
 │   └── metricflow/              # bundled MetricFlow engine (compile-only mode)
 └── mcp-client/                  # CLI client (separate package)
     └── client/
