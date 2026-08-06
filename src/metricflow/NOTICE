@@ -19,12 +19,12 @@ The following three upstream packages were merged into this single
 
 Local modifications (per Apache License 2.0, Section 4(b)):
 
-    1. Added `sql/render/doris.py`: a new Doris dialect SQL plan renderer
-       (`DorisSqlPlanRenderer`), not present upstream.
+    1. Added `sql/render/velodb.py`: a new VeloDB dialect SQL plan renderer
+       (`VeloDBSqlPlanRenderer`), not present upstream.
     2. Added `msi_pydantic_shim.py`: replaces the upstream
        `dsi_pydantic_shim` module for the merged
        metricflow-semantic-interfaces tree.
-    3. Modified `protocols/sql_client.py`: added the `DORIS` member to the
+    3. Modified `protocols/sql_client.py`: added the `VELODB` member to the
        `SqlEngine` enum and its engine-type mapping.
     4. Modified `semantic_interfaces/implementations/project_configuration.py`:
        patched the default `dsi_package_version` fallback — when the

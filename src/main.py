@@ -1,4 +1,4 @@
-"""Entry point for doris-new-mcp server."""
+"""Entry point for velodb-mcp-server server."""
 
 import argparse
 import os
@@ -8,8 +8,8 @@ from server import _decode_webui_session_cookie, create_server, resolve_machine_
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="doris-new-mcp: MCP Server for Apache Doris")
-    parser.add_argument("--config-dir", default=os.environ.get("DORIS_MCP_CONFIG_DIR", "."))
+    parser = argparse.ArgumentParser(description="velodb-mcp-server: MCP Server for Apache VeloDB")
+    parser.add_argument("--config-dir", default=os.environ.get("VELODB_MCP_CONFIG_DIR", "."))
     parser.add_argument("--env-file", default=None)
     args = parser.parse_args()
 

@@ -18,10 +18,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from store.store import DorisStore
+from store.store import VeloDBStore
 from store.version import SemanticLayerVersion, VersionTracker
 
-logger = logging.getLogger("doris_new_mcp.watcher")
+logger = logging.getLogger("velodb_mcp_server.watcher")
 
 
 def _check_staging_duplicates(models_dir: Path) -> tuple[list[str], list[str]]:
@@ -134,7 +134,7 @@ class RWLock:
 class WorkspaceState:
     """Runtime state for one workspace."""
     name: str
-    store: DorisStore
+    store: VeloDBStore
     config_dir: Path
     workspace_dir: Path
     models_dir: Path
@@ -236,14 +236,14 @@ class MultiWorkspaceWatcher:
     # ------------------------------------------------------------------
 
     def initialize(self) -> None:
-        """Discover and bootstrap all workspaces from Doris.
+        """Discover and bootstrap all workspaces from VeloDB.
 
         Must be called within request context (credentials must be set
         via set_request_credentials before calling this).
         """
         if self._initialized:
             return
-        existing = DorisStore.discover_workspaces()
+        existing = VeloDBStore.discover_workspaces()
         if not existing:
             logger.warning("No workspace tables found in system_mcp (active_store_*)")
         for ws_name in existing:
@@ -256,7 +256,7 @@ class MultiWorkspaceWatcher:
         # via api_workspace_create after earlier "not found" lookups).
         self.__dict__.setdefault("_missing_workspaces", {}).pop(ws_name, None)
 
-        store = DorisStore(workspace=ws_name)
+        store = VeloDBStore(workspace=ws_name)
         ws_dir = self._workspace_root / ws_name
         models_dir = ws_dir / "models_cache"
         ws_dir.mkdir(parents=True, exist_ok=True)
@@ -299,7 +299,7 @@ class MultiWorkspaceWatcher:
         prevents redundant reloads within _FRESHNESS_TTL seconds.
         A "workspace not found" verdict is negative-cached for
         _MISSING_WS_TTL seconds so repeated calls with a bad workspace
-        name don't each cost a Doris round-trip.
+        name don't each cost a VeloDB round-trip.
 
         Returns WorkspaceState on success, None if workspace not found
         or store unavailable.
@@ -317,7 +317,7 @@ class MultiWorkspaceWatcher:
             if cached_at is not None and now - cached_at < self._MISSING_WS_TTL:
                 return None
             try:
-                existing = set(DorisStore.discover_workspaces())
+                existing = set(VeloDBStore.discover_workspaces())
             except Exception:
                 logger.warning(f"ensure_fresh [{workspace_name}]: discover failed")
                 return None
@@ -383,7 +383,7 @@ class MultiWorkspaceWatcher:
             from store.manifest import SemanticManifest
             from store.compiler import MetricFlowCompiler
 
-            # Sync from Doris to local cache
+            # Sync from VeloDB to local cache
             ws.store.fetch(ws.models_dir)
 
             # Bootstrap

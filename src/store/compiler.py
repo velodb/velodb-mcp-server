@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("doris_new_mcp.semantic")
+logger = logging.getLogger("velodb_mcp_server.semantic")
 
 _SENTINEL_NO_JSON = object()
 
@@ -26,7 +26,7 @@ try:
         MetricFlowQueryRequest,
     )
     from metricflow.protocols.sql_client import SqlClient, SqlEngine
-    from metricflow.sql.render.doris import DorisSqlPlanRenderer
+    from metricflow.sql.render.velodb import VeloDBSqlPlanRenderer
     from metricflow.sql.render.sql_plan_renderer import SqlPlanRenderer
     from metricflow.semantics.model.semantic_manifest_lookup import SemanticManifestLookup
     from metricflow.semantics.model.dbt_manifest_parser import parse_manifest_from_dbt_generated_manifest
@@ -35,21 +35,21 @@ except ImportError:
     _ENGINE_AVAILABLE = False
 
 
-class _DorisSqlClientStub:
+class _VeloDBSqlClientStub:
     """Minimal SqlClient stub for compile-only mode.
 
     MetricFlowEngine requires a sql_client to render SQL in the correct dialect.
-    This stub provides sql_engine_type and sql_plan_renderer for Doris,
+    This stub provides sql_engine_type and sql_plan_renderer for VeloDB,
     but raises on any actual query execution.
     """
 
     @property
     def sql_engine_type(self) -> Any:
-        return SqlEngine.DORIS
+        return SqlEngine.VELODB
 
     @property
     def sql_plan_renderer(self) -> Any:
-        return DorisSqlPlanRenderer()
+        return VeloDBSqlPlanRenderer()
 
     def query(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("Compile-only mode: query execution not supported via MetricFlow sql_client")
@@ -90,14 +90,14 @@ class MetricFlowCompiler:
                 manifest_json = f.read()
             manifest = parse_manifest_from_dbt_generated_manifest(manifest_json)
             lookup = SemanticManifestLookup(manifest)
-            sql_client = _DorisSqlClientStub()
+            sql_client = _VeloDBSqlClientStub()
 
             self._engine = MetricFlowEngine(
                 semantic_manifest_lookup=lookup,
                 sql_client=sql_client,
             )
             self._engine_mode = True
-            logger.info("MetricFlow engine initialized in compile-only mode (Doris dialect)")
+            logger.info("MetricFlow engine initialized in compile-only mode (VeloDB dialect)")
         except Exception as e:
             logger.warning(f"Failed to init MetricFlow engine: {e}")
             self._engine_mode = False

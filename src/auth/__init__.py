@@ -1,4 +1,4 @@
-"""Authentication and authorization for doris-mcp.
+"""Authentication and authorization for velodb-mcp.
 
 Public API:
     - ``check_tool_access(tool_name)`` — per-tool authorization guard.

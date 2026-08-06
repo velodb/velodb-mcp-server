@@ -70,7 +70,7 @@ class ServiceHealth:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._components: dict[str, ComponentHealth] = {
-            "doris_connection": ComponentHealth(),
+            "velodb_connection": ComponentHealth(),
             "config_watcher": ComponentHealth(),
             "auth": ComponentHealth(),
         }
@@ -79,7 +79,7 @@ class ServiceHealth:
         """Reset to initial state (base components only)."""
         with self._lock:
             self._components = {
-                "doris_connection": ComponentHealth(),
+                "velodb_connection": ComponentHealth(),
                 "config_watcher": ComponentHealth(),
                 "auth": ComponentHealth(),
             }

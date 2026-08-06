@@ -1,8 +1,8 @@
-"""Per-user Doris connection pool manager.
+"""Per-user VeloDB connection pool manager.
 
-Manages independent connection pools for each authenticated Doris user.
+Manages independent connection pools for each authenticated VeloDB user.
 Pools are created lazily via get_or_create_local_pool and validated
-against the configured Doris FE endpoint (SELECT 1).
+against the configured VeloDB FE endpoint (SELECT 1).
 """
 
 from __future__ import annotations
@@ -14,17 +14,17 @@ from typing import Callable
 from config.loader import ClusterConfig
 from core.connection import ConnectionPool
 
-logger = logging.getLogger("doris_new_mcp.pool_manager")
+logger = logging.getLogger("velodb_mcp_server.pool_manager")
 
 
 def _is_auth_error(exc: Exception) -> bool:
-    """Check if an exception is caused by Doris authentication failure."""
+    """Check if an exception is caused by VeloDB authentication failure."""
     msg = str(exc).lower()
     return "access denied" in msg or "password" in msg or "authentication" in msg
 
 
 class PoolManager:
-    """Manages per-user connection pools for Doris."""
+    """Manages per-user connection pools for VeloDB."""
 
     def __init__(self, cluster: ClusterConfig):
         self._cluster = cluster
@@ -39,7 +39,7 @@ class PoolManager:
     ) -> ConnectionPool:
         """Get or create a per-user pool.
 
-        ``host`` optionally overrides the configured Doris FE host.
+        ``host`` optionally overrides the configured VeloDB FE host.
 
         ``on_auth_error`` is called if a newly-created pool fails its first
         connection — used to invalidate the credential cache.

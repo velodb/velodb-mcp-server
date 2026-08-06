@@ -1,4 +1,4 @@
-"""Async connection pool for a single Doris cluster."""
+"""Async connection pool for a single VeloDB cluster."""
 
 from __future__ import annotations
 
@@ -10,11 +10,11 @@ import aiomysql
 
 from config.loader import ClusterConfig
 
-logger = logging.getLogger("doris_new_mcp.connection")
+logger = logging.getLogger("velodb_mcp_server.connection")
 
 
 class ConnectionPool:
-    """Manages an aiomysql pool for the Doris cluster."""
+    """Manages an aiomysql pool for the VeloDB cluster."""
 
     def __init__(
         self,
@@ -50,7 +50,7 @@ class ConnectionPool:
                 connect_timeout=10,
                 autocommit=True,
                 # Recycle connections idle longer than this so a connection
-                # silently dropped by Doris wait_timeout is never reused.
+                # silently dropped by VeloDB wait_timeout is never reused.
                 pool_recycle=self._cluster.pool_idle_timeout,
             )
             return self._pool

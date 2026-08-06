@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from starlette.requests import Request
     from starlette.responses import Response
 
-    from store.store import DorisStore
+    from store.store import VeloDBStore
 
 from auth import check_tool_access, init_guard
 from config.loader import AppConfig
@@ -39,9 +39,9 @@ from tools.discovery import (
 )
 from tools.query import execute_query as _execute_query
 
-logger = logging.getLogger("doris_new_mcp")
+logger = logging.getLogger("velodb_mcp_server")
 
-_WEBUI_SESSION_COOKIE = "doris_mcp_session"
+_WEBUI_SESSION_COOKIE = "velodb_mcp_session"
 _ADMIN_USER = "admin"
 
 # RFC 1918 private IPv4 networks (excludes loopback, link-local, etc.)
@@ -226,7 +226,7 @@ def create_server(
 ) -> FastMCP:
     """Create and configure the MCP server."""
     if config_dir is None:
-        config_dir = os.environ.get("DORIS_MCP_CONFIG_DIR", "config")
+        config_dir = os.environ.get("VELODB_MCP_CONFIG_DIR", "config")
 
     config_path = os.path.abspath(config_dir)
     # Reuse a pre-built config when the caller (main.py) already parsed it,
@@ -253,8 +253,8 @@ def create_server(
 
     # Multi-workspace watcher (lazy — discovered on first request)
     from store.watcher import MultiWorkspaceWatcher
-    from store.store import set_doris_endpoint
-    set_doris_endpoint(cc.fe_host, cc.fe_mysql_port)
+    from store.store import set_velodb_endpoint
+    set_velodb_endpoint(cc.fe_host, cc.fe_mysql_port)
     multi_watcher = MultiWorkspaceWatcher(
         config_dir=_Path(config_path),
         workspace_root=_ws_root,
@@ -265,7 +265,7 @@ def create_server(
     async def _deploy_example(user: str, password: str) -> bool:
         """Deploy example data/models with verified Admin credentials."""
         nonlocal _watcher_initialized
-        from store.seed import seed_all, set_doris_port as seed_set_port
+        from store.seed import seed_all, set_velodb_port as seed_set_port
         from store.store import set_request_credentials as _set_creds
 
         async with _example_lock:
@@ -294,7 +294,7 @@ def create_server(
     async def _delete_example(user: str, password: str) -> None:
         """Delete example deployment and detach it from the global router."""
         from store.seed import delete_example
-        from store.store import DorisStore, set_request_credentials as _set_creds
+        from store.store import VeloDBStore, set_request_credentials as _set_creds
 
         async with _example_lock:
             _set_creds(user, password)
@@ -302,7 +302,7 @@ def create_server(
             multi_watcher._workspaces.pop("example", None)
             multi_watcher._staging_validated.discard("example")
             multi_watcher.router.rebuild(multi_watcher._workspaces)
-            DorisStore._table_cache.pop("example", None)
+            VeloDBStore._table_cache.pop("example", None)
 
             import shutil as _shutil
             await asyncio.to_thread(
@@ -391,7 +391,7 @@ def create_server(
     os.makedirs(os.path.dirname(audit_path), exist_ok=True)
     init_audit_log(audit_path, when=cfg.mcp.log_rotation_when, backup_count=cfg.mcp.log_rotation_backup_count)
 
-    # Per-user pool manager — all Doris connections use request credentials.
+    # Per-user pool manager — all VeloDB connections use request credentials.
     pool_manager: PoolManager | None = PoolManager(cc)
 
     init_guard(
@@ -402,7 +402,7 @@ def create_server(
     # Init health tracking
     from core.health import service_health
     service_health.reset()
-    service_health.get("doris_connection").set_healthy(
+    service_health.get("velodb_connection").set_healthy(
         f"Admin pool: {cc.fe_host}:{cc.fe_mysql_port}", user="admin")
     if cfg.auth is not None:
         if cfg.auth.static:
@@ -417,14 +417,14 @@ def create_server(
     else:
         service_health.get("auth").set_healthy("Auth disabled (no auth config)")
 
-    # Credential-based auth: username:password → Doris verification → 10-min cache
+    # Credential-based auth: username:password → VeloDB verification → 10-min cache
     from auth.credential_cache import CredentialCache
     from auth.credential_verifier import CredentialVerifier
     _credential_cache = CredentialCache(ttl_seconds=600)
 
     async def _async_verify_credentials(user: str, password: str) -> bool:
-        """Async wrapper for Doris credential verification."""
-        ok, _ = await asyncio.to_thread(_verify_doris_credentials, user, password)
+        """Async wrapper for VeloDB credential verification."""
+        ok, _ = await asyncio.to_thread(_verify_velodb_credentials, user, password)
         return ok
 
     auth_provider = CredentialVerifier(_credential_cache, _async_verify_credentials,
@@ -436,9 +436,9 @@ def create_server(
         """Extract workspace from query param for all methods."""
         return (request.query_params.get("workspace", "") or "example").strip()
 
-    def _get_store(workspace: str) -> DorisStore:
-        """Get or create a DorisStore for the given workspace."""
-        from store.store import DorisStore as _DS
+    def _get_store(workspace: str) -> VeloDBStore:
+        """Get or create a VeloDBStore for the given workspace."""
+        from store.store import VeloDBStore as _DS
         return _DS(workspace=workspace)
 
     from starlette.datastructures import UploadFile as _UploadFile
@@ -557,18 +557,18 @@ def create_server(
         try:
             return await _get_per_user_pool()
         except Exception as e:
-            logger.warning("%s: cannot acquire Doris connection: %s", tool_name, e)
+            logger.warning("%s: cannot acquire VeloDB connection: %s", tool_name, e)
             return error_response(
                 ErrorCode.CONNECTION_ERROR,
-                f"Cannot connect to Doris with the supplied credentials: {e}",
+                f"Cannot connect to VeloDB with the supplied credentials: {e}",
             )
 
-    # MCP node identity for session affinity. Doris connections use fe_host.
+    # MCP node identity for session affinity. VeloDB connections use fe_host.
     _MACHINE_IP = machine_ip if machine_ip is not None else resolve_machine_ip()
     _CONFIGURED_PRIVATE_IPS = get_configured_private_ips(_MACHINE_IP)
     logger.info("Configured private IPv4 addresses: %s", _CONFIGURED_PRIVATE_IPS)
 
-    def _verify_doris_credentials(user: str, password: str) -> tuple[bool, bool]:
+    def _verify_velodb_credentials(user: str, password: str) -> tuple[bool, bool]:
         import pymysql
         if _login_locked(user):
             # Same result as a wrong password — do not reveal lock state.
@@ -606,15 +606,15 @@ def create_server(
             session_id, server_ip, session = None, None, None
         if session and session["server_ip"] == server_ip:
             if time.time() - session["created_at"] < _SESSION_TTL:
-                client_id = session["doris_user"]
+                client_id = session["velodb_user"]
                 is_admin = (client_id == _ADMIN_USER)
                 if require_admin and not is_admin:
                     return None, False, JSONResponse(
                         {"success": False, "error": {"code": "PERMISSION_DENIED", "message": "Only admin can modify semantic models."}},
                         status_code=403)
                 from store.store import set_request_credentials
-                set_request_credentials(client_id, session.get("doris_password", ""))
-                await _ensure_initialized(client_id, session.get("doris_password", ""))
+                set_request_credentials(client_id, session.get("velodb_password", ""))
+                await _ensure_initialized(client_id, session.get("velodb_password", ""))
                 return client_id, is_admin, None
             del _webui_sessions[session_id]
 
@@ -625,7 +625,7 @@ def create_server(
             parts = token_str.split(":", 1)
             username = parts[0]
             password = parts[1] if len(parts) > 1 else ""
-            ok, is_admin = await asyncio.to_thread(_verify_doris_credentials, username, password)
+            ok, is_admin = await asyncio.to_thread(_verify_velodb_credentials, username, password)
             if ok:
                 if require_admin and not is_admin:
                     return None, False, JSONResponse(
@@ -687,7 +687,7 @@ def create_server(
                 },
                 status_code=401,
             )
-        # The Doris admin username is fixed; its password remains request-scoped.
+        # The VeloDB admin username is fixed; its password remains request-scoped.
         if not session.get("is_admin"):
             return None, _JSONResponse(
                 {
@@ -701,14 +701,14 @@ def create_server(
             )
 
         from store.store import set_request_credentials
-        set_request_credentials(session.get("doris_user", ""), session.get("doris_password", ""))
+        set_request_credentials(session.get("velodb_user", ""), session.get("velodb_password", ""))
         return session, None
 
     # Load query guide from package resource
     _query_guide = ""
     try:
         from importlib.resources import files
-        _query_guide = files("skills").joinpath("doris-mcp-skill.md").read_text(encoding="utf-8")
+        _query_guide = files("skills").joinpath("velodb-mcp-skill.md").read_text(encoding="utf-8")
     except Exception as e:
         logger.warning(f"Failed to load query guide: {e}")
 
@@ -729,7 +729,7 @@ def create_server(
                     await pool_manager.close_all()
                 except Exception:
                     logger.exception("Failed during pool_manager.close_all()")
-            logger.info("All Doris connection pools closed")
+            logger.info("All VeloDB connection pools closed")
 
     mcp = FastMCP(
         name=cfg.mcp.name,
@@ -855,29 +855,29 @@ def create_server(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def check_service_health() -> str:
-        """FIRST TOOL to call at the start of any session. Returns doris connectivity and all workspace statuses. Use to determine which workspaces are available."""
+        """FIRST TOOL to call at the start of any session. Returns velodb connectivity and all workspace statuses. Use to determine which workspaces are available."""
         auth = check_tool_access("check_service_health")
         if auth.denied:
             return auth.denied
         start = time.monotonic()
 
-        # Verify Doris DB connectivity (use per-user pool with request credentials)
+        # Verify VeloDB DB connectivity (use per-user pool with request credentials)
         db_ok = False
         db_error = ""
         health_pool = await _acquire_pool("check_service_health")
         try:
             if isinstance(health_pool, str):
-                raise RuntimeError("credentials rejected by Doris")
+                raise RuntimeError("credentials rejected by VeloDB")
             await health_pool.execute("SELECT 1")
             db_ok = True
         except Exception as e:
             db_error = str(e)
 
         if db_ok:
-            service_health.get("doris_connection").set_healthy(
-                f"Doris FE {cc.fe_host}:{cc.fe_mysql_port}", user="admin")
+            service_health.get("velodb_connection").set_healthy(
+                f"VeloDB FE {cc.fe_host}:{cc.fe_mysql_port}", user="admin")
         else:
-            service_health.get("doris_connection").set_error(f"Connection failed: {db_error}")
+            service_health.get("velodb_connection").set_error(f"Connection failed: {db_error}")
 
         # Ensure all known workspaces are loaded (on-demand)
         for ws_name in multi_watcher.workspace_names():
@@ -915,11 +915,11 @@ def create_server(
                     }
 
         health_data = {
-            "doris": "connected" if db_ok else "unavailable",
+            "velodb": "connected" if db_ok else "unavailable",
             "workspaces": ws_statuses,
         }
         if not db_ok:
-            health_data["doris_error"] = db_error
+            health_data["velodb_error"] = db_error
 
         log_tool_call("check_service_health", client_id=auth.client_id,
                       duration_ms=(time.monotonic() - start) * 1000, metricflow=False)
@@ -1072,8 +1072,8 @@ def create_server(
                 status_code=400,
             )
 
-        user = session.get("doris_user", "") if session else ""
-        password = session.get("doris_password", "") if session else ""
+        user = session.get("velodb_user", "") if session else ""
+        password = session.get("velodb_password", "") if session else ""
 
         if _example_job["status"] == "running":
             return _JSONResponse(
@@ -1155,14 +1155,14 @@ def create_server(
             return _JSONResponse({"success": False, "error": {"code": "FORBIDDEN", "message": "Cannot delete built-in example workspace"}}, status_code=403)
         
         # DROP only semantic model tables (active_store + staging_store), NOT data tables
-        from store.store import DorisStore
-        await asyncio.to_thread(DorisStore.drop_workspace_tables, name)
+        from store.store import VeloDBStore
+        await asyncio.to_thread(VeloDBStore.drop_workspace_tables, name)
         # Immediately remove from watcher and clear table cache so it disappears from UI
         multi_watcher._workspaces.pop(name, None)
         multi_watcher.router.rebuild(multi_watcher._workspaces)
-        # Clear the DorisStore class-level table cache so re-creation works
-        from store.store import DorisStore
-        DorisStore._table_cache.pop(name, None)
+        # Clear the VeloDBStore class-level table cache so re-creation works
+        from store.store import VeloDBStore
+        VeloDBStore._table_cache.pop(name, None)
         logger.info(f"Workspace '{name}' deleted by {client_id}")
         return _JSONResponse({"success": True, "data": {"workspace": name, "message": f"Workspace '{name}' deleted"}})
 
@@ -1287,7 +1287,7 @@ def create_server(
   .error { background: #fce8e6; color: var(--danger); padding: 10px 14px;
            border-radius: 6px; margin-bottom: 16px; font-size: .85rem; }
 </style></head><body><div class="card"><h1>{{SERVER_NAME}}</h1>
-<p class="sub">Login with your Doris credentials</p>{{ERROR}}
+<p class="sub">Login with your VeloDB credentials</p>{{ERROR}}
 <form method="post"><label>Username</label><input name="user" required autofocus>
 <label>Password</label><input name="password" type="password">
 <button type="submit">Sign in</button></form></div></body></html>"""
@@ -1328,11 +1328,11 @@ def create_server(
         if not user:
             return _HTML(_render_login("Username is required."), status_code=400)
 
-        ok, is_admin = await asyncio.to_thread(_verify_doris_credentials, user, password)
+        ok, is_admin = await asyncio.to_thread(_verify_velodb_credentials, user, password)
         if not ok:
             return _HTML(_render_login(f"Authentication failed for user '{user}'. Check your credentials."), status_code=401)
 
-        # Create session (any authenticated Doris user can log in)
+        # Create session (any authenticated VeloDB user can log in)
         _prune_webui_sessions()
         session_id = _secrets.token_urlsafe(32)
         private_ip = _webui_private_ip(
@@ -1340,8 +1340,8 @@ def create_server(
         )
         session_cookie_value = _encode_webui_session_cookie(session_id, private_ip)
         _webui_sessions[session_id] = {
-            "doris_user": user,
-            "doris_password": password,
+            "velodb_user": user,
+            "velodb_password": password,
             "server_ip": private_ip,
             "created_at": time.time(),
             "is_admin": is_admin,

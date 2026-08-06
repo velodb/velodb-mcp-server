@@ -39,7 +39,7 @@ def load_toml(path: str | Path) -> dict:
 class McpConfig:
     def __init__(self, data: dict):
         srv = data.get("server", {})
-        self.name: str = srv.get("mcp_name", "doris-new-mcp")
+        self.name: str = srv.get("mcp_name", "velodb-mcp-server")
         self.host: str = srv.get("mcp_host", "0.0.0.0")
         self.port: int = srv.get("mcp_port", 3000)
 

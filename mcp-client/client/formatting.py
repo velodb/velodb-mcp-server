@@ -102,12 +102,12 @@ def print_semantic_status(result: Any) -> bool:
         return False
 
     inner = data.get("data", {}) if isinstance(data.get("data"), dict) else {}
-    doris_status = inner.get("doris", "unknown")
+    velodb_status = inner.get("velodb", "unknown")
     workspaces = inner.get("workspaces") if isinstance(inner.get("workspaces"), dict) else {}
-    doris_error = inner.get("doris_error", "")
+    velodb_error = inner.get("velodb_error", "")
 
-    d_style = "green" if doris_status == "connected" else "red"
-    console.print(f"Doris: [bold {d_style}]{doris_status}[/]" + (f" \u2014 {doris_error}" if doris_error else ""))
+    d_style = "green" if velodb_status == "connected" else "red"
+    console.print(f"VeloDB: [bold {d_style}]{velodb_status}[/]" + (f" \u2014 {velodb_error}" if velodb_error else ""))
     console.print()
 
     if not workspaces:

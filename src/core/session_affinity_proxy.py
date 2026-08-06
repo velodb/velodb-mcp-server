@@ -16,7 +16,7 @@ SessionDecoder: TypeAlias = Callable[[str], tuple[str, str] | None]
 
 logger = logging.getLogger(__name__)
 
-_INTERNAL_HOP_HEADER = b"x-doris-session-affinity-hop"
+_INTERNAL_HOP_HEADER = b"x-velodb-session-affinity-hop"
 _HOP_BY_HOP_HEADERS = {
     b"connection",
     b"keep-alive",
@@ -107,7 +107,7 @@ class SessionAffinityProxy:
         decoder: SessionDecoder,
         local_ip: str,
         target_port: int,
-        cookie_name: str = "doris_mcp_session",
+        cookie_name: str = "velodb_mcp_session",
         client: httpx.AsyncClient | None = None,
         timeout: httpx.TimeoutTypes | None = None,
     ) -> None:

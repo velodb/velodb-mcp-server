@@ -29,10 +29,10 @@ from metricflow.sql.render.expr_renderer import (
 from metricflow.sql.render.sql_plan_renderer import DefaultSqlPlanRenderer
 
 
-class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
-    """Expression renderer for the Apache Doris engine.
+class VeloDBSqlExpressionRenderer(DefaultSqlExpressionRenderer):
+    """Expression renderer for the Apache VeloDB engine.
 
-    Doris uses MySQL-compatible protocol but has its own SQL dialect differences:
+    VeloDB uses MySQL-compatible protocol but has its own SQL dialect differences:
     - Uses DATETIME instead of TIMESTAMP
     - DATE_TRUNC supports both parameter orders; we use the standard ('unit', col) order
     - DAYOFWEEK/EXTRACT(DOW) returns 1=Sunday..7=Saturday (needs ISO conversion)
@@ -40,11 +40,11 @@ class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
     - Only supports PERCENTILE_APPROX for approximate continuous percentile
     """
 
-    sql_engine = SqlEngine.DORIS
+    sql_engine = SqlEngine.VELODB
 
     @override
     def visit_column_reference_expr(self, node: SqlColumnReferenceExpression) -> SqlExpressionRenderResult:
-        """Render column references with lowercased table aliases for Doris case sensitivity."""
+        """Render column references with lowercased table aliases for VeloDB case sensitivity."""
         if node.should_render_table_alias:
             return SqlExpressionRenderResult(
                 sql=f"{node.col_ref.table_alias.lower()}.{node.col_ref.column_name}",
@@ -57,9 +57,9 @@ class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
 
     @override
     def visit_string_expr(self, node: SqlStringExpression) -> SqlExpressionRenderResult:
-        """Render string expressions with lowercased table alias references for Doris case sensitivity.
+        """Render string expressions with lowercased table alias references for VeloDB case sensitivity.
 
-        Doris is case-sensitive for table aliases. When a string expression looks like a simple
+        VeloDB is case-sensitive for table aliases. When a string expression looks like a simple
         alias.column reference (e.g., 'V.ds'), lowercase the alias part to match the FROM clause.
         """
         sql = node.sql_expr
@@ -76,7 +76,7 @@ class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
     @property
     @override
     def timestamp_data_type(self) -> str:
-        """Doris uses DATETIME rather than TIMESTAMP as its primary date-time type."""
+        """VeloDB uses DATETIME rather than TIMESTAMP as its primary date-time type."""
         return "DATETIME"
 
     @property
@@ -88,7 +88,7 @@ class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
     def render_date_part(self, date_part: DatePart) -> str:
         """Render DATE PART for an EXTRACT expression.
 
-        Doris does not support 'isodow'. We use 'DOW' and handle ISO conversion in visit_extract_expr.
+        VeloDB does not support 'isodow'. We use 'DOW' and handle ISO conversion in visit_extract_expr.
         """
         if date_part is DatePart.DOW:
             return "DOW"
@@ -97,9 +97,9 @@ class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
 
     @override
     def visit_extract_expr(self, node: SqlExtractExpression) -> SqlExpressionRenderResult:
-        """Render EXTRACT with ISO day-of-week conversion for Doris.
+        """Render EXTRACT with ISO day-of-week conversion for VeloDB.
 
-        Doris EXTRACT(DOW ...) returns 1=Sunday..7=Saturday, but ISO standard is 1=Monday..7=Sunday.
+        VeloDB EXTRACT(DOW ...) returns 1=Sunday..7=Saturday, but ISO standard is 1=Monday..7=Sunday.
         We apply: IF(extract_result = 1, 7, extract_result - 1)
         """
         extract_rendering_result = super().visit_extract_expr(node)
@@ -117,7 +117,7 @@ class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
 
     @override
     def visit_subtract_time_interval_expr(self, node: SqlSubtractTimeIntervalExpression) -> SqlExpressionRenderResult:
-        """Render time interval subtraction for Doris: DATE_SUB(CAST(col AS DATETIME), INTERVAL count unit)."""
+        """Render time interval subtraction for VeloDB: DATE_SUB(CAST(col AS DATETIME), INTERVAL count unit)."""
         column = node.arg.accept(self)
 
         count = node.count
@@ -133,7 +133,7 @@ class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
 
     @override
     def visit_add_time_expr(self, node: SqlAddTimeExpression) -> SqlExpressionRenderResult:
-        """Render time addition for Doris: DATE_ADD(CAST(col AS DATETIME), INTERVAL count_expr unit)."""
+        """Render time addition for VeloDB: DATE_ADD(CAST(col AS DATETIME), INTERVAL count_expr unit)."""
         granularity = node.granularity
         count_expr = node.count_expr
         if granularity is TimeGranularity.QUARTER:
@@ -154,7 +154,7 @@ class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
 
     @override
     def visit_percentile_expr(self, node: SqlPercentileExpression) -> SqlExpressionRenderResult:
-        """Render a percentile expression for Doris using PERCENTILE_APPROX."""
+        """Render a percentile expression for VeloDB using PERCENTILE_APPROX."""
         arg_rendered = self.render_sql_expr(node.order_by_arg)
         params = arg_rendered.bind_parameter_set
         percentile = node.percentile_args.percentile
@@ -170,17 +170,17 @@ class DorisSqlExpressionRenderer(DefaultSqlExpressionRenderer):
             or node.percentile_args.function_type is SqlPercentileFunctionType.DISCRETE
         ):
             raise RuntimeError(
-                "Only approximate continuous percentile aggregations are supported for Doris. Set "
+                "Only approximate continuous percentile aggregations are supported for VeloDB. Set "
                 + "use_approximate_percentile and disable use_discrete_percentile in all percentile simple-metrics."
             )
         else:
             assert_values_exhausted(node.percentile_args.function_type)
 
 
-class DorisSqlPlanRenderer(DefaultSqlPlanRenderer):
-    """Plan renderer for the Apache Doris engine."""
+class VeloDBSqlPlanRenderer(DefaultSqlPlanRenderer):
+    """Plan renderer for the Apache VeloDB engine."""
 
-    EXPR_RENDERER = DorisSqlExpressionRenderer()
+    EXPR_RENDERER = VeloDBSqlExpressionRenderer()
 
     @property
     @override

@@ -1,6 +1,6 @@
-"""Semantic configuration store backed by Doris.
+"""Semantic configuration store backed by VeloDB.
 
-Multi-workspace: each workspace has its own pair of Doris tables:
+Multi-workspace: each workspace has its own pair of VeloDB tables:
 
   system_mcp.active_store_{workspace}   — active (production) models
   system_mcp.staging_store_{workspace}  — pending changes
@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pymysql
 
-logger = logging.getLogger("doris_new_mcp.store")
+logger = logging.getLogger("velodb_mcp_server.store")
 
 # ---------------------------------------------------------------------------
 # StoreState
@@ -47,22 +47,22 @@ class StoreState:
 
 
 # ---------------------------------------------------------------------------
-# DorisStore
+# VeloDBStore
 # ---------------------------------------------------------------------------
 
-_DORIS_HOST = "127.0.0.1"
-_DORIS_PORT = 9030
-_DORIS_DB = "system_mcp"
+_VELODB_HOST = "127.0.0.1"
+_VELODB_PORT = 9030
+_VELODB_DB = "system_mcp"
 
 # Request-scoped credential override. Set once at the start of each
 # authenticated request, read by _get_conn(). Destroyed when the
 # asyncio Task ends — no cross-request leakage.
 _request_creds: contextvars.ContextVar[tuple[str, str] | None] = \
-    contextvars.ContextVar('_doris_store_creds', default=None)
+    contextvars.ContextVar('_velodb_store_creds', default=None)
 
 
 def set_request_credentials(user: str, password: str) -> None:
-    """Inject Doris credentials for the current request.
+    """Inject VeloDB credentials for the current request.
 
     Called once at request entry (CredentialVerifier or HTTP auth).
     The credentials live only for the duration of this asyncio Task.
@@ -70,36 +70,36 @@ def set_request_credentials(user: str, password: str) -> None:
     _request_creds.set((user, password))
 
 
-def set_doris_endpoint(host: str, port: int) -> None:
-    """Update the Doris FE endpoint from server configuration."""
-    global _DORIS_HOST, _DORIS_PORT
-    _DORIS_HOST = host
-    _DORIS_PORT = port
+def set_velodb_endpoint(host: str, port: int) -> None:
+    """Update the VeloDB FE endpoint from server configuration."""
+    global _VELODB_HOST, _VELODB_PORT
+    _VELODB_HOST = host
+    _VELODB_PORT = port
 
 
-def set_doris_port(port: int) -> None:
-    """Update only the Doris FE port while preserving the configured host."""
-    global _DORIS_PORT
-    _DORIS_PORT = port
+def set_velodb_port(port: int) -> None:
+    """Update only the VeloDB FE port while preserving the configured host."""
+    global _VELODB_PORT
+    _VELODB_PORT = port
 
 
 def _get_conn() -> pymysql.Connection:
     creds = _request_creds.get()
     if creds is None:
         raise RuntimeError(
-            "No Doris credentials in request context. "
+            "No VeloDB credentials in request context. "
             "Ensure the request carries a valid Bearer token or session cookie."
         )
     user, password = creds
     return pymysql.connect(
-        host=_DORIS_HOST, port=_DORIS_PORT,
+        host=_VELODB_HOST, port=_VELODB_PORT,
         user=user, password=password,
         charset="utf8mb4", autocommit=True,
         connect_timeout=5,
     )
 
 
-class DorisStore:
+class VeloDBStore:
     """Semantic model storage for a single workspace.
 
     Each workspace has its own pair of tables:
@@ -123,11 +123,11 @@ class DorisStore:
 
     @property
     def store_type(self) -> str:
-        return "doris"
+        return "velodb"
 
     @property
     def source_uri(self) -> str:
-        return f"doris://{_DORIS_HOST}:{_DORIS_PORT}/{_DORIS_DB}/{self._active_table}"
+        return f"velodb://{_VELODB_HOST}:{_VELODB_PORT}/{_VELODB_DB}/{self._active_table}"
 
     @property
     def active_table(self) -> str:
@@ -147,8 +147,8 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"CREATE DATABASE IF NOT EXISTS {_DORIS_DB}")
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"CREATE DATABASE IF NOT EXISTS {_VELODB_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute("SHOW TABLES LIKE 'active_store_%'")
                 tables = [r[0] for r in cur.fetchall()]
         finally:
@@ -167,7 +167,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(f"DROP TABLE IF EXISTS active_store_{workspace}")
                 cur.execute(f"DROP TABLE IF EXISTS staging_store_{workspace}")
             logger.info(f"Dropped semantic tables for workspace '{workspace}'")
@@ -183,7 +183,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 try:
                     cur.execute(f"SHOW TABLETS FROM {self._active_table}")
                     rows = cur.fetchall()
@@ -210,7 +210,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(f"SELECT filename, updated_at, content FROM {self._active_table}")
                 rows = cur.fetchall()
         finally:
@@ -256,7 +256,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(
                     f"SELECT filename, updated_at, LENGTH(content) AS size_bytes "
                     f"FROM {self._active_table} ORDER BY filename"
@@ -277,7 +277,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(f"SELECT filename, updated_at, content FROM {self._active_table} WHERE filename = %s", (filename,))
                 row = cur.fetchone()
         finally:
@@ -299,7 +299,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(
                     f"SELECT filename, action, updated_at, LENGTH(content) AS size_bytes "
                     f"FROM {self._staging_table} ORDER BY filename"
@@ -321,7 +321,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(f"SELECT 1 FROM {self._staging_table} WHERE filename = %s", (filename,))
                 if cur.fetchone():
                     cur.execute(
@@ -349,7 +349,7 @@ class DorisStore:
         result = "not_found"
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 # Check staging first
                 cur.execute(f"SELECT 1 FROM {self._staging_table} WHERE filename = %s", (filename,))
                 if cur.fetchone():
@@ -375,7 +375,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(f"DELETE FROM {self._staging_table}")
         finally:
             conn.close()
@@ -388,7 +388,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(f"SELECT filename, content FROM {self._active_table}")
                 active = {r[0]: r[1] for r in cur.fetchall()}
                 cur.execute(f"SELECT filename, action, content FROM {self._staging_table}")
@@ -425,7 +425,7 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(f"SELECT filename, action, content, updated_at FROM {self._staging_table}")
                 stg_rows = cur.fetchall()
 
@@ -480,8 +480,8 @@ class DorisStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"CREATE DATABASE IF NOT EXISTS {_DORIS_DB}")
-                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"CREATE DATABASE IF NOT EXISTS {_VELODB_DB}")
+                cur.execute(f"USE {_VELODB_DB}")
                 cur.execute(f"""\
                     CREATE TABLE IF NOT EXISTS {self._active_table} (
                         filename    VARCHAR(512) NOT NULL,

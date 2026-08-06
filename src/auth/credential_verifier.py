@@ -1,6 +1,6 @@
 """Credential-based token verifier.
 
-Parses ``Bearer username:password``, validates against Doris via non-127.0.0.1
+Parses ``Bearer username:password``, validates against VeloDB via non-127.0.0.1
 IP, and caches valid credentials for 10 minutes.
 
 Registered as a FastMCP ``TokenVerifier``.
@@ -15,17 +15,17 @@ from fastmcp.server.auth import AccessToken, TokenVerifier
 
 from auth.credential_cache import CredentialCache
 
-logger = logging.getLogger("doris_new_mcp.auth")
+logger = logging.getLogger("velodb_mcp_server.auth")
 
 
 class CredentialVerifier(TokenVerifier):
-    """Validate ``username:password`` credentials against Doris.
+    """Validate ``username:password`` credentials against VeloDB.
 
     Flow:
     1. Split ``Bearer username:password`` on first ``:``
     2. Check CredentialCache (10-min TTL)
     3. Cache hit → return AccessToken
-    4. Cache miss → verify against Doris via non-127.0.0.1 IP
+    4. Cache miss → verify against VeloDB via non-127.0.0.1 IP
     5. Valid → cache credentials → return AccessToken
     6. Invalid → return None
     """
@@ -72,21 +72,21 @@ class CredentialVerifier(TokenVerifier):
                 expires_at=None,
             )
 
-        # Cache miss — verify against Doris
-        logger.debug("Credential cache MISS for user '%s', verifying against Doris", username)
+        # Cache miss — verify against VeloDB
+        logger.debug("Credential cache MISS for user '%s', verifying against VeloDB", username)
         try:
             valid = await self._verify_fn(username, password)
         except Exception as e:
-            logger.warning("Doris verification failed for user '%s': %s", username, e)
+            logger.warning("VeloDB verification failed for user '%s': %s", username, e)
             return None
 
         if not valid:
-            logger.info("Doris authentication FAILED for user '%s'", username)
+            logger.info("VeloDB authentication FAILED for user '%s'", username)
             return None
 
         # Cache valid credentials
         self._cache.add(username, password)
-        logger.info("Doris authentication OK for user '%s' (cached for 10 min)", username)
+        logger.info("VeloDB authentication OK for user '%s' (cached for 10 min)", username)
         from store.store import set_request_credentials
         set_request_credentials(username, password)
         if self._on_authenticated:

@@ -14,9 +14,9 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from store.store import _get_conn, set_doris_port as _store_set_port
+from store.store import _get_conn, set_velodb_port as _store_set_port
 
-logger = logging.getLogger("doris_new_mcp.seed")
+logger = logging.getLogger("velodb_mcp_server.seed")
 
 EXAMPLE_MODEL_FILENAMES = frozenset({
     "orders.yaml",
@@ -32,7 +32,7 @@ EXAMPLE_DATA_TABLES = frozenset({
 })
 
 
-def set_doris_port(port: int) -> None:
+def set_velodb_port(port: int) -> None:
     _store_set_port(port)
 
 # ---------------------------------------------------------------------------

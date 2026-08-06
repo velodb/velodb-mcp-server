@@ -11,7 +11,7 @@ import httpx
 
 
 def _use_system_proxy() -> bool:
-    val = os.environ.get("DORIS_MCP_USE_SYSTEM_PROXY", "").strip().lower()
+    val = os.environ.get("VELODB_MCP_USE_SYSTEM_PROXY", "").strip().lower()
     return val in ("1", "true", "yes", "on")
 
 
@@ -119,7 +119,7 @@ def semantic_pull(server_url: str, token: str, output_dir: str, workspace: str =
 
     import shutil
     import tempfile
-    staging = Path(tempfile.mkdtemp(prefix=".doris-mcp-pull-", dir=str(out.parent)))
+    staging = Path(tempfile.mkdtemp(prefix=".velodb-mcp-pull-", dir=str(out.parent)))
     try:
         count, total_bytes = _extract_with_limits(resp.content, staging)
 
@@ -279,7 +279,7 @@ def _mask_secrets(text: str) -> str:
 
 
 def _is_debug() -> bool:
-    val = os.environ.get("DORIS_MCP_DEBUG", "").strip().lower()
+    val = os.environ.get("VELODB_MCP_DEBUG", "").strip().lower()
     return val in ("1", "true", "yes", "on")
 
 

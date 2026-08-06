@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-logger = logging.getLogger("doris_new_mcp.semantic")
+logger = logging.getLogger("velodb_mcp_server.semantic")
 
 
 class SemanticManifest:

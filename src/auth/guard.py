@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from core.pool_manager import PoolManager
 
-logger = logging.getLogger("doris_new_mcp.auth")
+logger = logging.getLogger("velodb_mcp_server.auth")
 
 _pool_manager: PoolManager | None = None
 _transport: str = "streamable-http"

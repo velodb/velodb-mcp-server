@@ -1,7 +1,7 @@
 """In-memory credential cache with TTL.
 
 Stores validated (username, password) pairs for a configurable duration.
-After TTL expires, re-verification against Doris is required.
+After TTL expires, re-verification against VeloDB is required.
 
 Thread-safe.
 """
@@ -12,17 +12,17 @@ import hashlib
 import threading
 import time
 
-logger = __import__("logging").getLogger("doris_new_mcp.credential_cache")
+logger = __import__("logging").getLogger("velodb_mcp_server.credential_cache")
 
 
 class CredentialCache:
-    """In-memory cache of verified Doris credentials.
+    """In-memory cache of verified VeloDB credentials.
 
     Key = SHA256(username + ":" + password)  (never store raw passwords in plain text)
     Value = expiry timestamp (epoch seconds)
 
     TTL = 600 seconds (10 minutes). After expiry, credentials must be
-    re-verified against Doris via non-127.0.0.1 connection.
+    re-verified against VeloDB via non-127.0.0.1 connection.
     """
 
     def __init__(self, ttl_seconds: int = 600) -> None:
@@ -50,7 +50,7 @@ class CredentialCache:
             self._cache[key] = time.time() + self._ttl
 
     def clear(self, username: str, password: str) -> None:
-        """Remove credentials from cache (e.g. password changed on Doris)."""
+        """Remove credentials from cache (e.g. password changed on VeloDB)."""
         key = self._make_key(username, password)
         with self._lock:
             self._cache.pop(key, None)

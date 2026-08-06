@@ -8,7 +8,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from core.sensitive_mask import mask_dict, mask_sensitive
 
-logger = logging.getLogger("doris_new_mcp.request_logger")
+logger = logging.getLogger("velodb_mcp_server.request_logger")
 logger.setLevel(logging.DEBUG)
 
 # Ensure at least one handler exists
@@ -69,7 +69,7 @@ class RequestLoggerMiddleware:
         await self.app(scope, receive_wrapper, send_wrapper)
 
         # Log body (after it has been consumed; masked — e.g. the WebUI
-        # login form posts the Doris password in plaintext)
+        # login form posts the VeloDB password in plaintext)
         raw_body = b"".join(body_chunks)
         if raw_body:
             try:

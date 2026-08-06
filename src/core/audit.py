@@ -10,7 +10,7 @@ from typing import Any
 
 from core.sensitive_mask import mask_sensitive
 
-_logger = logging.getLogger("doris_new_mcp.audit")
+_logger = logging.getLogger("velodb_mcp_server.audit")
 
 _initialized = False
 

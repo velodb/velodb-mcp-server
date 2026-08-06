@@ -1,7 +1,7 @@
 """Bootstrap semantic manifest from user YAML config files.
 
 Uses the built-in MetricFlow YAML parser to directly compile semantic models
-without requiring dbt or a live Doris connection.
+without requiring dbt or a live VeloDB connection.
 
 User provides:
   config/models/*.yml
@@ -32,10 +32,10 @@ from metricflow.semantic_interfaces.parsing.dir_to_model import (
     parse_directory_of_yaml_files_to_semantic_manifest,
 )
 
-logger = logging.getLogger("doris_new_mcp.semantic")
+logger = logging.getLogger("velodb_mcp_server.semantic")
 
 _DB_TABLE_RE = re.compile(r'^(\s*)db_table:\s*(.+)$', re.MULTILINE)
-_DORIS_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_VELODB_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _normalize_db_table(yaml_text: str) -> tuple[str, bool]:
@@ -231,7 +231,7 @@ def _copy_and_normalize_models(source_dir: Path, temp_dir: Path) -> bool:
 def bootstrap_from_yaml(models_dir: Path, workspace_dir: Path) -> tuple[bool, str]:
     """Parse YAML model files directly into a semantic manifest.
 
-    No dbt, no Doris connection, no dbt_project.yml or profiles.yml needed.
+    No dbt, no VeloDB connection, no dbt_project.yml or profiles.yml needed.
     Pure in-process YAML → PydanticSemanticManifest → JSON.
 
     Supports `db_table: db.table` as a shorthand for `node_relation:`.
@@ -352,12 +352,12 @@ def collect_physical_tables(models_dir: Path) -> set[str]:
 
 
 def grant_select_on_physical_tables(tables: set[str]) -> None:
-    """Grant all Doris users SELECT only on the supplied physical tables."""
+    """Grant all VeloDB users SELECT only on the supplied physical tables."""
     quoted_tables = []
     for table in sorted(tables):
         parts = table.split(".")
         if len(parts) not in (2, 3) or any(
-            not _DORIS_IDENTIFIER_RE.fullmatch(part) for part in parts
+            not _VELODB_IDENTIFIER_RE.fullmatch(part) for part in parts
         ):
             raise ValueError(f"Invalid semantic table name: {table}")
         quoted_tables.append(".".join(f"`{part}`" for part in parts))
@@ -384,10 +384,10 @@ def pre_validate_physical(
     db_password: str | None = None,
 ) -> tuple[bool, str]:
     """Validate that all tables and columns referenced in model YAML files
-    actually exist in Doris.
+    actually exist in VeloDB.
 
     Checks for each semantic_model:
-      - db_table / node_relation resolves to an existing Doris table
+      - db_table / node_relation resolves to an existing VeloDB table
       - entity.expr column exists (only for simple column names, not SQL expressions)
       - measure.expr column exists (only for simple column names, not SQL expressions)
       - dimension.expr column exists (only for simple column names, not SQL expressions)
@@ -395,10 +395,10 @@ def pre_validate_physical(
 
     Args:
         models_dir: Directory containing YAML model files
-        db_host: Doris host (defaults to store's _DORIS_HOST)
-        db_port: Doris port (defaults to store's _DORIS_PORT)
-        db_user: Doris user (overrides request credentials)
-        db_password: Doris password (overrides request credentials)
+        db_host: VeloDB host (defaults to store's _VELODB_HOST)
+        db_port: VeloDB port (defaults to store's _VELODB_PORT)
+        db_user: VeloDB user (overrides request credentials)
+        db_password: VeloDB password (overrides request credentials)
 
     Returns:
         (success, error_message)
@@ -412,15 +412,15 @@ def pre_validate_physical(
 
     # P2-4: Resolve connection config — prefer explicit params, then request
     # contextvar credentials (set by server.py before all store operations).
-    from store.store import _DORIS_HOST, _DORIS_PORT, _request_creds
-    host = db_host or _DORIS_HOST
-    port = db_port or _DORIS_PORT
+    from store.store import _VELODB_HOST, _VELODB_PORT, _request_creds
+    host = db_host or _VELODB_HOST
+    port = db_port or _VELODB_PORT
     if db_user and db_password is not None:
         user, password = db_user, db_password
     else:
         creds = _request_creds.get()
         if creds is None:
-            return False, "No Doris credentials available — request must carry a valid Bearer token"
+            return False, "No VeloDB credentials available — request must carry a valid Bearer token"
         user, password = creds
 
     # P1-3: Detect expressions that are NOT simple column names

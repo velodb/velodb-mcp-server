@@ -1,4 +1,4 @@
-# Doris MCP Query Skill
+# VeloDB MCP Query Skill
 
 > You are reading this because you called `get_query_guide()`. All tool-calling rules below are mandatory — follow them strictly.
 
@@ -29,7 +29,7 @@ Returns:
 
 ```json
 {
-  "doris": "connected",
+  "velodb": "connected",
   "workspaces": {
     "example":   {"status": "healthy",    "metric_count": 5},
     "marketing": {"status": "no_models",  "message": "No YAML files"},
@@ -41,7 +41,7 @@ Returns:
 **Rules:**
 - Pick a workspace with `status: "healthy"` — only `query_metric` works there.
 - If the user mentions a specific workspace, use it. Otherwise use `"example"`.
-- If `doris` is `"unavailable"`, warn the user. `list_databases` / `execute_query` may still work.
+- If `velodb` is `"unavailable"`, warn the user. `list_databases` / `execute_query` may still work.
 - If NO workspace is healthy → fall back to raw SQL path (see bottom).
 
 ---
@@ -119,7 +119,7 @@ If the user's question doesn't clearly match any metric, call `list_metrics` and
 | `order_by` | list[string] | No | `[]` | `-` prefix = DESC, e.g. `["-total_amount"]` |
 | `limit` | int | No | `0` | Max rows. `0` = no limit |
 | `having` | string | No | `""` | Filter on aggregated value, e.g. `"total_amount > 1000"` |
-| `database` | string | No | `""` | Target Doris database (auto-detected if empty) |
+| `database` | string | No | `""` | Target VeloDB database (auto-detected if empty) |
 | `max_rows` | int | No | `0` | Hard row cap for execution. `0` = server default (10,000) |
 
 ### Response

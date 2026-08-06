@@ -2,7 +2,7 @@
 
 Two modes (no fallback between them):
   - Config file: ``--config`` argument (TOML)
-  - Environment: ``DORIS_MCP_SERVER`` + ``DORIS_MCP_TOKEN``
+  - Environment: ``VELODB_MCP_SERVER`` + ``VELODB_MCP_TOKEN``
 """
 
 from __future__ import annotations
@@ -57,21 +57,21 @@ def resolve_token() -> tuple[str, str]:
         toml = _load_toml_config(_cli_config_path)
         if not toml:
             raise RuntimeError(f"Failed to parse config file: {_cli_config_path}")
-        url = toml.get("server", {}).get("DORIS_MCP_SERVER")
-        token = toml.get("server", {}).get("DORIS_MCP_TOKEN")
+        url = toml.get("server", {}).get("VELODB_MCP_SERVER")
+        token = toml.get("server", {}).get("VELODB_MCP_TOKEN")
         if not url or not token:
             raise RuntimeError(
-                f"Config file {_cli_config_path} must contain [server] DORIS_MCP_SERVER and DORIS_MCP_TOKEN."
+                f"Config file {_cli_config_path} must contain [server] VELODB_MCP_SERVER and VELODB_MCP_TOKEN."
             )
         return url.rstrip("/"), token
 
     # Environment variables mode
-    env_token = _get_env("DORIS_MCP_TOKEN")
-    env_url = _get_env("DORIS_MCP_SERVER")
+    env_token = _get_env("VELODB_MCP_TOKEN")
+    env_url = _get_env("VELODB_MCP_SERVER")
     if env_token and env_url:
         return env_url.rstrip("/"), env_token
 
     raise RuntimeError(
         "No server configured. "
-        "Use --config <path> or set DORIS_MCP_SERVER + DORIS_MCP_TOKEN."
+        "Use --config <path> or set VELODB_MCP_SERVER + VELODB_MCP_TOKEN."
     )

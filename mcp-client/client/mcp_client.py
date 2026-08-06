@@ -59,7 +59,7 @@ def _run(server_url: str, token: str, op: str, coro_factory):
         raise
     except Exception as e:
         import os
-        if os.environ.get("DORIS_MCP_DEBUG", "").strip().lower() in ("1", "true", "yes", "on"):
+        if os.environ.get("VELODB_MCP_DEBUG", "").strip().lower() in ("1", "true", "yes", "on"):
             raise RuntimeError(f"{op} failed: {type(e).__name__}: {e}") from None
         raise RuntimeError(f"{op} failed: {e}") from None
 

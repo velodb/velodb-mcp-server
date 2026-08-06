@@ -13,12 +13,12 @@ from client import formatting
 
 def _verbose_callback(value: bool):
     if value:
-        os.environ["DORIS_MCP_DEBUG"] = "1"
+        os.environ["VELODB_MCP_DEBUG"] = "1"
 
 
 app = typer.Typer(
     name="mcp-client",
-    help="CLI client for mcp-server. Uses DORIS_MCP_SERVER + DORIS_MCP_TOKEN env vars or mcp-client.toml.",
+    help="CLI client for mcp-server. Uses VELODB_MCP_SERVER + VELODB_MCP_TOKEN env vars or mcp-client.toml.",
     no_args_is_help=True,
     pretty_exceptions_enable=False,
 )
@@ -30,7 +30,7 @@ def main(
         bool,
         typer.Option("--verbose", "-v", callback=_verbose_callback,
                      help="Show detailed error responses (tokens masked). "
-                          "Equivalent to DORIS_MCP_DEBUG=1."),
+                          "Equivalent to VELODB_MCP_DEBUG=1."),
     ] = False,
     config: Annotated[
         Optional[str],

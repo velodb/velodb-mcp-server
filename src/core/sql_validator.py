@@ -1,4 +1,4 @@
-"""SQL validation using sqlglot AST parsing for Doris dialect."""
+"""SQL validation using sqlglot AST parsing for VeloDB dialect."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ _READONLY_TYPES = (
     exp.Union,
 )
 
-# Doris SHOW/DESCRIBE/EXPLAIN are parsed as Command by sqlglot
+# VeloDB SHOW/DESCRIBE/EXPLAIN are parsed as Command by sqlglot
 _READONLY_COMMAND_PREFIXES = (
     "SHOW",
     "DESCRIBE",
