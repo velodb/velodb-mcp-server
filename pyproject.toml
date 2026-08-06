@@ -1,7 +1,7 @@
 [project]
 name = "velodb-mcp-server"
 version = "1.3.1"
-description = "Apache VeloDB MCP Server — VeloDB query service over the MCP protocol, with a built-in MetricFlow semantic layer"
+description = "VeloDB MCP Server — VeloDB query service over the MCP protocol, with a built-in MetricFlow semantic layer"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

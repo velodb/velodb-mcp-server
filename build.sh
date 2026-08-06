@@ -194,27 +194,36 @@ _ensure_python() {
     local tarball_name="cpython-${PY_VERSION}+${PY_STANDALONE_RELEASE}-${platform}-install_only_stripped.tar.gz"
     local url="https://github.com/astral-sh/python-build-standalone/releases/download/${PY_STANDALONE_RELEASE}/${tarball_name}"
 
-    _info "Downloading Python $PY_VERSION for $platform ..."
     local tmp_dir
     tmp_dir="$(mktemp -d)"
     trap "rm -rf $tmp_dir" EXIT
 
     local tarball="$tmp_dir/$tarball_name"
-    if command -v curl > /dev/null 2>&1; then
-        curl -fsSL --connect-timeout 30 --max-time 600 -o "$tarball" "$url" || {
-            _error "Download failed: $url"
-            _error "Tip: set VELODB_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
-            exit 1
-        }
-    elif command -v wget > /dev/null 2>&1; then
-        wget -q --timeout=30 --tries=3 -O "$tarball" "$url" || {
-            _error "Download failed: $url"
-            _error "Tip: set VELODB_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
-            exit 1
-        }
+
+    # Allow using a pre-downloaded tarball (useful for slow/unstable networks).
+    if [ -n "${VELODB_MCP_PYTHON_TARBALL:-}" ] && [ -f "$VELODB_MCP_PYTHON_TARBALL" ] && [ -s "$VELODB_MCP_PYTHON_TARBALL" ]; then
+        _info "Using pre-downloaded Python tarball: $VELODB_MCP_PYTHON_TARBALL"
+        cp "$VELODB_MCP_PYTHON_TARBALL" "$tarball"
     else
-        _error "Need curl or wget"
-        exit 1
+        _info "Downloading Python $PY_VERSION for $platform ..."
+        if command -v curl > /dev/null 2>&1; then
+            curl -fsSL --connect-timeout 30 --max-time 3600 -o "$tarball" "$url" || {
+                _error "Download failed: $url"
+                _error "Tip: set VELODB_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
+                _error "Tip: set VELODB_MCP_PYTHON_TARBALL=/path/to/${tarball_name} to use a pre-downloaded tarball"
+                exit 1
+            }
+        elif command -v wget > /dev/null 2>&1; then
+            wget -q --timeout=30 --tries=3 -O "$tarball" "$url" || {
+                _error "Download failed: $url"
+                _error "Tip: set VELODB_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
+                _error "Tip: set VELODB_MCP_PYTHON_TARBALL=/path/to/${tarball_name} to use a pre-downloaded tarball"
+                exit 1
+            }
+        else
+            _error "Need curl or wget"
+            exit 1
+        fi
     fi
 
     if [ ! -f "$tarball" ] || [ ! -s "$tarball" ]; then
@@ -266,7 +275,8 @@ _pack() {
     local name="$1"         # velodb-mcp-server
     local platform="$2"
     shift 2                 # remaining arguments are paths relative to SCRIPT_DIR
-    local pkg_name="${name}-${VERSION}-${platform}"
+    local pkg_platform="${platform//-/_}"   # linux-x64 → linux_x64
+    local pkg_name="${name}-${VERSION}-${pkg_platform}"
     local outfile="$DIST_DIR/${pkg_name}.tar.gz"
 
     _info "Packing: ${pkg_name}.tar.gz"
@@ -314,7 +324,7 @@ build() {
 
     _ensure_python "$platform_label" "$platform_url"
 
-    rm -rf "$DIST_DIR"
+    # Do not clear all dist/ so packages for multiple platforms can coexist.
     mkdir -p "$DIST_DIR"
 
     _pack "velodb-mcp-server" "$platform_label" \
@@ -331,7 +341,7 @@ build() {
     echo "  ────────────────────────────────────────────"
     echo "  Build complete!  Platform: $platform_label"
     echo ""
-    echo "  tar xzf velodb-mcp-server-${VERSION}-${platform_label}.tar.gz"
+    echo "  tar xzf velodb-mcp-server-${VERSION}-${platform_label//-/_}.tar.gz"
     echo "  cd velodb-mcp-server"
     echo ""
     echo "    Server:  ./start-mcp-server.sh"
