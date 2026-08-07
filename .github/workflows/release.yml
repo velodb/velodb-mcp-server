@@ -1,0 +1,91 @@
+# =============================================================================
+# Release — build linux x64 / arm64 and publish a GitHub Release
+#
+#   Triggers (both manual; PR merges no longer auto-release):
+#     1. Push a tag manually:  git tag velodb-mcp-server-0.2.5 && git push origin velodb-mcp-server-0.2.5
+#     2. Trigger manually from the Actions page (version number required)
+#
+#   Artifacts:  velodb-mcp-server-<version>-linux_x64.tar.gz
+#              velodb-mcp-server-<version>-linux_arm64.tar.gz
+#   (platform names use underscores in tarball filenames, produced by build.sh)
+#   Both extract to the top-level directory velodb-mcp-server/ (consistent with the original build.sh convention)
+#
+#   Notes:  private repos have no free ARM runners, so linux-arm64 is cross-built
+#         on an x64 runner via build.sh (pip --platform wheel unpacking).
+#         Once the repo goes public, the arm64 runner can be switched to a native
+#         ubuntu-24.04-arm build.
+# =============================================================================
+name: Release
+
+on:
+  push:
+    tags: ["velodb-mcp-server-*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version number (e.g. 0.2.5, without prefix)"
+        required: true
+
+jobs:
+  # ── Resolve the version number for this release ────────────────────────
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#velodb-mcp-server-}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+  # ── Build (x64 native + arm64 cross) ───────────────────────────────────
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux-x64, linux-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.platform }}
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: ./build.sh ${{ matrix.platform }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: velodb-mcp-server-${{ needs.version.outputs.version }}-${{ matrix.platform }}
+          # Each matrix job builds a single platform, so dist/ contains exactly one tarball.
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  # ── Tag + publish the Release ──────────────────────────────────────────
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: velodb-mcp-server-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # If the tag does not exist, it is created automatically on the current commit
+          tag_name: velodb-mcp-server-${{ needs.version.outputs.version }}
+          name: velodb-mcp-server-${{ needs.version.outputs.version }}
+          files: dist/*.tar.gz
+          body: ""

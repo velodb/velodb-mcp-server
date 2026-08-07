@@ -1,0 +1,1932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VeloDB MCP Documentation</title>
+  <style>
+:root {
+  --bg: #fff;
+  --surface: #f8f9fa;
+  --border: #dee2e6;
+  --text: #212529;
+  --muted: #6c757d;
+  --accent: #0d6efd;
+  --green: #198754;
+  --red: #dc3545;
+  --purple: #6f42c1;
+  --code-bg: #f4f4f4;
+  --table-stripe: #f2f6fc;
+  --shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--bg); }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.75; color: var(--text); background: var(--bg); font-size: 15px; }
+header { background: linear-gradient(rgb(240, 245, 255) 0%, rgb(255, 255, 255) 100%); border-bottom: 3px solid var(--accent); padding: 2.5rem 2rem 2rem; }
+header h1 { max-width: 920px; margin: 0 auto; font-size: 1.8rem; color: var(--accent); font-weight: 700; }
+header p { max-width: 920px; margin: 0.5rem auto 0; color: var(--muted); font-size: 0.95rem; }
+.container { max-width: 920px; margin: 0 auto; padding: 2rem 2.5rem 4rem; }
+.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem 1.5rem; margin: 0 0 1.5rem; }
+.toc h3 { font-size: 0.95rem; color: var(--muted); margin-bottom: 0.6rem; }
+.toc ol { padding-left: 1.2rem; font-size: 0.9rem; line-height: 2; }
+.toc ul { padding-left: 0; font-size: 0.9rem; line-height: 2; list-style: none; }
+.toc li { margin: 0.25rem 0; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+h2 { font-size: 1.35rem; color: var(--accent); margin: 2.5rem 0 0.8rem; padding-bottom: 0.35rem; border-bottom: 2px solid var(--border); }
+h3 { font-size: 1.08rem; color: var(--text); margin: 1.6rem 0 0.5rem; }
+p { margin: 0.5rem 0; max-width: 86ch; }
+ul, ol { padding-left: 1.7rem; margin: 0.7rem 0; }
+li { margin: 0.25rem 0; }
+strong { color: var(--text); }
+a { color: var(--accent); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 1.6rem 0; }
+blockquote { background: rgb(231, 241, 255); border-left: 4px solid var(--accent); padding: 0.7rem 1rem; margin: 0.8rem 0; border-radius: 0 6px 6px 0; color: var(--text); font-size: 0.9rem; }
+code { background: var(--code-bg); padding: 0.12em 0.4em; border-radius: 4px; font-family: "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.88em; white-space: pre-wrap; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.3rem; margin: 0.8rem 0; overflow-x: auto; font-size: 0.8rem; line-height: 1.65; }
+pre code { background: none; padding: 0; white-space: pre; }
+div.sourceCode { margin: 0.8rem 0; overflow-x: auto; }
+div.sourceCode pre { margin: 0; }
+.sourceCode a { color: inherit; text-decoration: none; }
+.sourceCode span { line-height: inherit; }
+table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.88rem; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+th { background: var(--surface); font-weight: 600; color: var(--text); }
+tr:nth-child(2n) { background: var(--table-stripe); }
+footer { text-align: center; color: var(--muted); padding: 1.5rem; font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 3rem; }
+@media (max-width: 700px) { body { font-size: 14px; } header { padding: 2rem 1rem 1.6rem; } header h1 { font-size: 1.55rem; } .container { padding: 1.25rem 1rem 3rem; } .toc { border-radius: 8px; padding: 1rem 1.1rem; } pre { padding: 0.85rem 1rem; } }
+body { padding-top: 64px; }
+.top-tabs { position: fixed; inset: 0 0 auto 0; z-index: 20; background: rgba(255, 255, 255, 0.96); border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); }
+.tab-inner { max-width: 920px; margin: 0 auto; display: flex; gap: 0.35rem; padding: 0.75rem 2.5rem; overflow-x: auto; }
+.tab-button { appearance: none; border: 1px solid transparent; background: transparent; color: var(--muted); border-radius: 8px; padding: 0.5rem 0.85rem; font: inherit; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.tab-button:hover { color: var(--accent); background: var(--surface); }
+.tab-button.active { color: var(--accent); background: rgb(231, 241, 255); border-color: rgb(190, 215, 255); }
+.doc-panel { display: none; }
+.doc-panel.active { display: block; }
+.right-toc { position: fixed; top: 88px; right: max(1rem, calc((100vw - 1280px) / 2)); width: 230px; max-height: calc(100vh - 110px); overflow: auto; padding: 1rem 1rem 1.1rem; background: rgba(248, 249, 250, 0.96); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+.right-toc h3 { margin: 0 0 0.65rem; color: var(--muted); font-size: 0.9rem; }
+.right-toc ul { margin: 0; padding-left: 0; font-size: 0.84rem; line-height: 1.65; list-style: none; }
+.right-toc li { margin: 0.35rem 0; }
+.right-toc a { color: var(--text); text-decoration: none; }
+.right-toc a:hover { color: var(--accent); }
+@media (max-width: 1260px) { .right-toc { display: none; } }
+@media (min-width: 1261px) { header h1, header p, .container, .tab-inner { transform: translateX(-90px); } }
+@media (max-width: 700px) { body { padding-top: 58px; } .tab-inner { padding: 0.65rem 1rem; } .tab-button { padding: 0.45rem 0.7rem; } }
+  </style>
+  <style>
+
+/* === MetricFlow semantic model styles === */
+
+  :root {
+    --bg: #faf9f7;
+    --card: #ffffff;
+    --text: #2d2d2d;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --primary-light: #dbeafe;
+    --accent: #7c3aed;
+    --accent-light: #ede9fe;
+    --success: #059669;
+    --success-light: #d1fae5;
+    --danger: #dc2626;
+    --danger-light: #fee2e2;
+    --warning: #d97706;
+    --warning-light: #fef3c7;
+    --border: #e5e7eb;
+    --code-bg: #f3f4f6;
+    --radius: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 15px;
+  }
+
+  /* ── Layout ── */
+  .hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%);
+    color: white;
+    padding: 64px 32px 48px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 2.2rem; font-weight: 700; letter-spacing: -0.5px; }
+  .hero p { font-size: 1.1rem; opacity: .85; margin-top: 12px; max-width: 600px; margin-inline: auto; }
+  .hero .badges { margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .hero .badge {
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.2);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: .85rem;
+  }
+
+  .container { max-width: 880px; margin: 0 auto; padding: 40px 24px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .card.tip { border-left: 4px solid var(--primary); background: var(--primary-light); }
+  .card.warn { border-left: 4px solid var(--danger); background: var(--danger-light); }
+  .card.info { border-left: 4px solid var(--accent); background: var(--accent-light); }
+
+  /* ── Typography ── */
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.15rem; font-weight: 600; margin: 28px 0 8px; color: #1f2937; }
+  p { margin: 10px 0; }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: .92rem;
+  }
+  th {
+    background: #f8fafc;
+    color: #374151;
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  td:first-child, th:first-child { font-family: "SF Mono", "Fira Code", monospace; font-size: .88rem; }
+  td code { background: var(--code-bg); padding: 1px 6px; border-radius: 3px; }
+
+  /* ── Code ── */
+  pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 20px 24px;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: .88rem;
+    line-height: 1.6;
+  }
+  pre .kw { color: #cba6f7; }
+  pre .str { color: #a6e3a1; }
+  pre .cmt { color: #6c7086; font-style: italic; }
+  pre .num { color: #fab387; }
+  pre .fn { color: #89b4fa; }
+
+  code {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: .9em;
+  }
+  pre code { background: none; padding: 0; }
+
+  /* ── Highlight boxes ── */
+  .box { padding: 12px 18px; border-radius: 8px; margin: 16px 0; font-size: .95rem; }
+  .box-ok { background: var(--success-light); border: 1px solid #a7f3d0; }
+  .box-warn { background: var(--warning-light); border: 1px solid #fde68a; }
+  .box-info { background: var(--primary-light); border: 1px solid #bfdbfe; }
+
+  /* ── Nav ── */
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 32px;
+  }
+  .toc h3 { margin-top: 0; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 4px 0; font-size: .95rem; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .hero { padding: 40px 16px 32px; }
+    .hero h1 { font-size: 1.5rem; }
+    .container { padding: 20px 14px; }
+    .card { padding: 18px 16px; }
+  }
+
+  </style>
+</head>
+<body>
+<nav class="top-tabs" role="tablist" aria-label="VeloDB MCP Documentation">
+  <div class="tab-inner">
+    <button id="tab-semantic" class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="panel-semantic" data-tab="semantic">VeloDB MCP Semantic Models</button>
+    <button id="tab-server" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-server" data-tab="server">VeloDB MCP User Guide</button>
+  </div>
+</nav>
+
+<aside class="right-toc" aria-label="Table of contents">
+  <h3>Contents</h3>
+  <ul id="right-toc-list"></ul>
+</aside>
+
+<section id="panel-semantic" class="doc-panel active" role="tabpanel" aria-labelledby="tab-semantic">
+<header>
+  <h1>VeloDB MCP Semantic Models</h1>
+  <p>MetricFlow v0.209.0 — the complete specification from YAML definitions to SQL queries</p>
+</header>
+<div class="container">
+
+<!-- ════════════════ HERO ════════════════ -->
+
+
+<!-- ════════════════ TOC ════════════════ -->
+<div class="toc">
+  <h3>📑 Contents</h3>
+  <ol>
+    <li><a href="#intro">What is a semantic model?</a></li>
+    <li><a href="#quickstart">Quick start</a></li>
+    <li><a href="#model">Semantic model structure</a></li>
+    <li><a href="#entities">Entities — the table's "ID card"</a></li>
+    <li><a href="#dimensions">Dimensions — how data is grouped</a></li>
+    <li><a href="#measures">Measures — aggregate computations</a></li>
+    <li><a href="#full-example">Full example</a></li>
+    <li><a href="#advanced-metrics">Advanced metric definitions</a></li>
+    <li><a href="#common-patterns">Common patterns</a></li>
+    <li><a href="#advanced-features">Advanced features</a></li>
+    <li><a href="#best-practices">Best practices</a></li>
+    <li><a href="#errors">Common errors &amp; troubleshooting</a></li>
+    <li><a href="#velodb-mcp">Semantic model management in velodb-mcp</a></li>
+    <li><a href="#webui-cli">Usage: WebUI &amp; CLI</a></li>
+  </ol>
+</div>
+
+<!-- ════════════════ 1. INTRO ════════════════ -->
+<h2 id="intro">1. What is a semantic model?</h2>
+
+<div class="card">
+  <p>A <strong>semantic model</strong> is a <strong>business description</strong> of a database table. You tell the system:</p>
+  <ul style="padding-left:20px; margin:12px 0;">
+    <li>What the table's <strong>primary key</strong> is (entities)</li>
+    <li>Which fields can be used for <strong>grouping</strong> (dimensions)</li>
+    <li>Which fields need <strong>aggregate computation</strong> (measures)</li>
+  </ul>
+  <p>Once defined, users can issue <strong>natural-language-level</strong> queries ("show me monthly total order amount") and the system automatically generates the correct SQL.</p>
+</div>
+
+<div class="card tip">
+  <strong>💡 In one sentence:</strong> YAML is the instruction manual, MetricFlow is the translator — it turns "monthly total order amount" into <code>SELECT DATE_TRUNC('month', order_date), SUM(amount) FROM orders GROUP BY 1</code>.
+</div>
+
+<!-- ════════════════ 2. QUICKSTART ════════════════ -->
+<h2 id="quickstart">2. Quick start</h2>
+
+<div class="card">
+  <h3 style="margin-top:0">Step 1: Write a YAML file</h3>
+  <p>Each YAML file describes <strong>one table</strong>. Put it under the <code>models/</code> directory:</p>
+
+<pre><span class="cmt"># models/orders.yaml</span>
+<span class="kw">---</span>
+<span class="kw">semantic_model:</span>
+  <span class="kw">name:</span> <span class="str">orders</span>                         <span class="cmt"># Model name</span>
+  <span class="kw">db_table:</span> <span class="str">dw.orders</span>                    <span class="cmt"># Corresponding VeloDB table</span>
+  <span class="kw">defaults:</span>
+    <span class="kw">agg_time_dimension:</span> <span class="str">order_date</span>    <span class="cmt"># Default time dimension</span>
+
+  <span class="kw">entities:</span>
+    <span class="kw">- name:</span> <span class="str">order_id</span>                     <span class="cmt"># Primary key</span>
+      <span class="kw">type:</span> <span class="str">primary</span>
+      <span class="kw">expr:</span> <span class="str">order_id</span>
+
+  <span class="kw">dimensions:</span>
+    <span class="kw">- name:</span> <span class="str">order_date</span>                   <span class="cmt"># Time dimension</span>
+      <span class="kw">type:</span> <span class="str">time</span>
+      <span class="kw">type_params:</span>
+        <span class="kw">time_granularity:</span> <span class="str">day</span>
+    <span class="kw">- name:</span> <span class="str">channel</span>                      <span class="cmt"># Categorical dimension</span>
+      <span class="kw">type:</span> <span class="str">categorical</span>
+
+  <span class="kw">measures:</span>
+    <span class="kw">- name:</span> <span class="str">total_amount</span>                 <span class="cmt"># Total order amount</span>
+      <span class="kw">agg:</span> <span class="str">sum</span>
+      <span class="kw">expr:</span> <span class="str">amount</span>
+    <span class="kw">- name:</span> <span class="str">order_count</span>                  <span class="cmt"># Number of orders</span>
+      <span class="kw">agg:</span> <span class="str">count</span>
+      <span class="kw">expr:</span> <span class="str">order_id</span>
+</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Step 2: Define the time configuration</h3>
+  <p>A <code>project.yaml</code> is required to specify the calendar table (used for time-based metrics such as YoY and MoM):</p>
+
+<pre><span class="cmt"># models/project.yaml</span>
+<span class="kw">---</span>
+<span class="kw">time_config:</span>
+  <span class="kw">calendar:</span>
+    <span class="kw">- table:</span> <span class="str">dw.dim_date</span>
+      <span class="kw">column:</span> <span class="str">date_id</span>
+      <span class="kw">grain:</span> <span class="str">day</span>
+</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Step 3: Validate &amp; commit</h3>
+  <ol style="padding-left:20px;">
+    <li>Click <strong>💡 Validate</strong> to check whether the model is correct</li>
+    <li>Once confirmed, click <strong>Commit</strong> to make the model take effect</li>
+    <li>Use <code>list_metrics</code> to view available metrics and <code>query_metric</code> to query data</li>
+  </ol>
+</div>
+
+<div class="box box-info">
+  <strong>⏱ Validation automatically checks:</strong> whether tables exist, whether column names are correct, and whether entities and dimensions are complete. If there are problems, it reports the specific error and location.
+</div>
+
+<!-- ════════════════ 3. MODEL STRUCTURE ════════════════ -->
+<h2 id="model">3. Semantic model structure</h2>
+
+<div class="card">
+  <p>A complete <code>semantic_model</code> contains the following fields:</p>
+
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>name</code></td><td>string</td><td>✅</td><td>Globally unique model name. Starts with a lowercase letter; may contain digits and underscores</td></tr>
+    <tr><td><code>db_table</code></td><td>string</td><td>✅</td><td>VeloDB physical table. Format: <code>database.table</code>, e.g. <code>dw.orders</code></td></tr>
+    <tr><td><code>defaults</code></td><td>object</td><td>✅</td><td>Default configuration. Must currently include <code>agg_time_dimension</code></td></tr>
+    <tr><td><code>entities</code></td><td>list</td><td>✅</td><td>Entity definitions for the table. Must include at least one <code>type: primary</code> entity</td></tr>
+    <tr><td><code>dimensions</code></td><td>list</td><td>✅</td><td>Dimensions available for grouping and filtering</td></tr>
+    <tr><td><code>measures</code></td><td>list</td><td>recommended</td><td>Aggregate computation definitions. Each automatically becomes a queryable metric</td></tr>
+    <tr><td><code>description</code></td><td>string</td><td>optional</td><td>Free-text description of the model</td></tr>
+    <tr><td><code>label</code></td><td>string</td><td>optional</td><td>Display name</td></tr>
+    <tr><td><code>primary_entity</code></td><td>string</td><td>conditional</td><td>Required when no <code>type: primary</code> entity exists</td></tr>
+  </table>
+</div>
+
+<div class="card warn">
+  <strong>⚠️ Naming rules:</strong> all names (models, entities, dimensions, measures) must:
+  <ul style="padding-left:20px; margin-top:6px;">
+    <li>Start with a lowercase letter</li>
+    <li>Contain only lowercase letters, digits, and underscores</li>
+    <li>Not contain two consecutive underscores <code>__</code></li>
+    <li>Be at least 2 characters long</li>
+  </ul>
+  ✅ <code>order_id</code>, <code>total_amount</code>, <code>user_count</code><br>
+  ❌ <code>OrderID</code>, <code>order__id</code>, <code>a</code>
+</div>
+
+<!-- ════════════════ 4. ENTITIES ════════════════ -->
+<h2 id="entities">4. Entities — the table's "ID card"</h2>
+
+<div class="card">
+  <p>Entities define the <strong>uniqueness and relationships between rows</strong>. Every table must have one <strong>primary entity</strong>.</p>
+
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>name</code></td><td>string</td><td>✅</td><td>Entity name, unique within the model</td></tr>
+    <tr><td><code>type</code></td><td>enum</td><td>✅</td><td>Entity type (see the table below)</td></tr>
+    <tr><td><code>expr</code></td><td>string</td><td>recommended</td><td>Corresponding database column. May be omitted (defaults to name); SQL expressions are also supported</td></tr>
+    <tr><td><code>description</code></td><td>string</td><td>optional</td><td>Free-text description</td></tr>
+    <tr><td><code>label</code></td><td>string</td><td>optional</td><td>Display name</td></tr>
+  </table>
+
+  <h3>Entity types</h3>
+  <table>
+    <tr><th>Type</th><th>Meaning</th><th>Use case</th></tr>
+    <tr><td><code>primary</code></td><td>Primary key. Unique per row, covers all records</td><td>The table's ID column. Each table must have exactly one primary entity</td></tr>
+    <tr><td><code>foreign</code></td><td>Foreign key. May have duplicates and nulls</td><td>Columns referencing other tables, e.g. <code>customer_id</code>, <code>product_id</code></td></tr>
+    <tr><td><code>unique</code></td><td>Unique key. Unique per row, may not cover all records</td><td>Unique identifiers such as email or national ID number</td></tr>
+    <tr><td><code>natural</code></td><td>Natural key. A real-world unique identifier</td><td>E.g. product barcodes, employee numbers</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Example: entity definitions for an orders table</h3>
+<pre><span class="kw">entities:</span>
+  <span class="kw">- name:</span> <span class="str">order_id</span>               <span class="cmt"># Primary key: unique ID of each order</span>
+    <span class="kw">type:</span> <span class="str">primary</span>
+    <span class="kw">expr:</span> <span class="str">order_id</span>
+
+  <span class="kw">- name:</span> <span class="str">customer</span>               <span class="cmt"># Foreign key: references the users table</span>
+    <span class="kw">type:</span> <span class="str">foreign</span>
+    <span class="kw">expr:</span> <span class="str">user_id</span>
+
+  <span class="kw">- name:</span> <span class="str">order_ref</span>              <span class="cmt"># Foreign key + SQL expression</span>
+    <span class="kw">type:</span> <span class="str">foreign</span>
+    <span class="kw">expr:</span> <span class="str">substring(trace_id FROM 1 FOR 8)</span>
+</pre>
+</div>
+
+<div class="box box-warn">
+  <strong>⚠️ Note:</strong> if the table has no <code>type: primary</code> entity, you can specify <code>primary_entity: entity_name</code> at the model's top level.
+</div>
+
+<!-- ════════════════ 5. DIMENSIONS ════════════════ -->
+<h2 id="dimensions">5. Dimensions — how data is grouped</h2>
+
+<div class="card">
+  <p>Dimensions define <strong>how data is grouped and filtered</strong>. There are two types: <strong>time dimensions</strong> and <strong>categorical dimensions</strong>.</p>
+
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>name</code></td><td>string</td><td>✅</td><td>Dimension name</td></tr>
+    <tr><td><code>type</code></td><td>enum</td><td>✅</td><td><code>time</code> or <code>categorical</code></td></tr>
+    <tr><td><code>type_params</code></td><td>object</td><td>required for time</td><td>Time granularity configuration (see below)</td></tr>
+    <tr><td><code>expr</code></td><td>string</td><td>recommended</td><td>Corresponding column name or SQL expression</td></tr>
+    <tr><td><code>is_partition</code></td><td>boolean</td><td>optional</td><td>Whether this is a partition column. Defaults to <code>false</code></td></tr>
+    <tr><td><code>description</code></td><td>string</td><td>optional</td><td>Free-text description</td></tr>
+    <tr><td><code>label</code></td><td>string</td><td>optional</td><td>Display name</td></tr>
+  </table>
+
+  <h3>Time granularity (<code>time_granularity</code>)</h3>
+  <table>
+    <tr><th>Granularity</th><th>Meaning</th><th>Example</th></tr>
+    <tr><td><code>day</code></td><td>By day</td><td>2025-01-15</td></tr>
+    <tr><td><code>week</code></td><td>By week</td><td>2025-W03</td></tr>
+    <tr><td><code>month</code></td><td>By month</td><td>2025-01</td></tr>
+    <tr><td><code>quarter</code></td><td>By quarter</td><td>2025-Q1</td></tr>
+    <tr><td><code>year</code></td><td>By year</td><td>2025</td></tr>
+    <tr><td><code>hour</code></td><td>By hour</td><td>2025-01-15 14:00</td></tr>
+    <tr><td><code>minute</code></td><td>By minute</td><td>2025-01-15 14:30</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Example</h3>
+<pre><span class="kw">dimensions:</span>
+  <span class="kw">- name:</span> <span class="str">order_date</span>               <span class="cmt"># Order date (by day)</span>
+    <span class="kw">type:</span> <span class="str">time</span>
+    <span class="kw">type_params:</span>
+      <span class="kw">time_granularity:</span> <span class="str">day</span>
+    <span class="kw">expr:</span> <span class="str">order_date</span>
+
+  <span class="kw">- name:</span> <span class="str">order_month</span>              <span class="cmt"># Order month (by month)</span>
+    <span class="kw">type:</span> <span class="str">time</span>
+    <span class="kw">type_params:</span>
+      <span class="kw">time_granularity:</span> <span class="str">month</span>
+    <span class="kw">expr:</span> <span class="str">order_date</span>               <span class="cmt"># Same column, different granularity</span>
+
+  <span class="kw">- name:</span> <span class="str">channel</span>                   <span class="cmt"># Channel (categorical)</span>
+    <span class="kw">type:</span> <span class="str">categorical</span>
+    <span class="kw">expr:</span> <span class="str">channel</span>
+
+  <span class="kw">- name:</span> <span class="str">status_label</span>             <span class="cmt"># With a SQL expression</span>
+    <span class="kw">type:</span> <span class="str">categorical</span>
+    <span class="kw">expr:</span> <span class="str">concat(status, '_', channel)</span>
+</pre>
+</div>
+
+<!-- ════════════════ 6. MEASURES ════════════════ -->
+<h2 id="measures">6. Measures — aggregate computations</h2>
+
+<div class="card">
+  <p>Measures define <strong>aggregate operations</strong> on data columns. Each measure automatically generates a <strong>query metric of the same name</strong>.</p>
+
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>name</code></td><td>string</td><td>✅</td><td>Measure name (also becomes the metric name)</td></tr>
+    <tr><td><code>agg</code></td><td>enum</td><td>✅</td><td>Aggregation type (see the table below)</td></tr>
+    <tr><td><code>expr</code></td><td>string</td><td>recommended</td><td>Column name or SQL expression participating in the computation</td></tr>
+    <tr><td><code>description</code></td><td>string</td><td>optional</td><td>Metric description</td></tr>
+    <tr><td><code>label</code></td><td>string</td><td>optional</td><td>Display name</td></tr>
+    <tr><td><code>create_metric</code></td><td>boolean</td><td>optional</td><td>Set to <code>false</code> to skip metric generation. Defaults to <code>true</code></td></tr>
+    <tr><td><code>agg_time_dimension</code></td><td>string</td><td>optional</td><td>Overrides the model's default time dimension</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Aggregation types at a glance</h3>
+  <table>
+    <tr><th>Type</th><th>Meaning</th><th>Typical usage</th></tr>
+    <tr><td><code>sum</code></td><td>Sum</td><td>Total amount, total count</td></tr>
+    <tr><td><code>count</code></td><td>Count</td><td>Number of orders, number of users</td></tr>
+    <tr><td><code>count_distinct</code></td><td>Distinct count</td><td>Unique users, active devices</td></tr>
+    <tr><td><code>average</code></td><td>Average</td><td>Average amount, average duration</td></tr>
+    <tr><td><code>min</code></td><td>Minimum</td><td>Lowest price, earliest time</td></tr>
+    <tr><td><code>max</code></td><td>Maximum</td><td>Highest price, latest time</td></tr>
+    <tr><td><code>median</code></td><td>Median</td><td>Median order amount</td></tr>
+    <tr><td><code>percentile</code></td><td>Percentile</td><td>P99 latency, P95 amount (requires <code>agg_params.percentile</code>)</td></tr>
+    <tr><td><code>sum_boolean</code></td><td>Boolean sum</td><td>Conversion count, times a target was met</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Example</h3>
+<pre><span class="kw">measures:</span>
+  <span class="kw">- name:</span> <span class="str">total_amount</span>            <span class="cmt"># Total order amount</span>
+    <span class="kw">description:</span> <span class="str">"Sum of all order amounts"</span>
+    <span class="kw">agg:</span> <span class="str">sum</span>
+    <span class="kw">expr:</span> <span class="str">amount</span>
+    <span class="kw">label:</span> <span class="str">"Total Amount"</span>
+
+  <span class="kw">- name:</span> <span class="str">order_count</span>             <span class="cmt"># Number of orders</span>
+    <span class="kw">agg:</span> <span class="str">count</span>
+    <span class="kw">expr:</span> <span class="str">order_id</span>
+
+  <span class="kw">- name:</span> <span class="str">unique_customers</span>        <span class="cmt"># Unique customers</span>
+    <span class="kw">description:</span> <span class="str">"Number of distinct customers who placed orders"</span>
+    <span class="kw">agg:</span> <span class="str">count_distinct</span>
+    <span class="kw">expr:</span> <span class="str">user_id</span>
+
+  <span class="kw">- name:</span> <span class="str">p99_amount</span>             <span class="cmt"># P99 order amount</span>
+    <span class="kw">agg:</span> <span class="str">percentile</span>
+    <span class="kw">expr:</span> <span class="str">amount</span>
+    <span class="kw">agg_params:</span>
+      <span class="kw">percentile:</span> <span class="num">0.99</span>
+
+  <span class="kw">- name:</span> <span class="str">internal_counter</span>       <span class="cmt"># Not exposed as a metric</span>
+    <span class="kw">agg:</span> <span class="str">sum</span>
+    <span class="kw">expr:</span> <span class="str">raw_value</span>
+    <span class="kw">create_metric:</span> <span class="kw">false</span>
+</pre>
+</div>
+<!-- ════════════════ 7. FULL EXAMPLE ════════════════ -->
+<h2 id="full-example">7. Full example</h2>
+
+<div class="card">
+  <p>Below is a complete semantic model definition for an e-commerce scenario — the <strong>orders table</strong>:</p>
+
+<pre><span class="cmt"># models/orders.yaml — orders fact table</span>
+<span class="kw">---</span>
+<span class="kw">semantic_model:</span>
+  <span class="kw">name:</span> <span class="str">orders</span>
+  <span class="kw">description:</span> <span class="str">"E-commerce orders fact table; each row is one order"</span>
+  <span class="kw">db_table:</span> <span class="str">dw.orders</span>
+  <span class="kw">defaults:</span>
+    <span class="kw">agg_time_dimension:</span> <span class="str">order_date</span>
+
+  <span class="cmt"># ── Entities ──</span>
+  <span class="kw">entities:</span>
+    <span class="kw">- name:</span> <span class="str">order_id</span>
+      <span class="kw">description:</span> <span class="str">"Order primary key"</span>
+      <span class="kw">type:</span> <span class="str">primary</span>
+      <span class="kw">expr:</span> <span class="str">order_id</span>
+
+    <span class="kw">- name:</span> <span class="str">customer</span>
+      <span class="kw">description:</span> <span class="str">"Associated user"</span>
+      <span class="kw">type:</span> <span class="str">foreign</span>
+      <span class="kw">expr:</span> <span class="str">user_id</span>
+
+    <span class="kw">- name:</span> <span class="str">product</span>
+      <span class="kw">description:</span> <span class="str">"Associated product"</span>
+      <span class="kw">type:</span> <span class="str">foreign</span>
+      <span class="kw">expr:</span> <span class="str">product_id</span>
+
+  <span class="cmt"># ── Dimensions ──</span>
+  <span class="kw">dimensions:</span>
+    <span class="kw">- name:</span> <span class="str">order_date</span>
+      <span class="kw">description:</span> <span class="str">"Order date (by day)"</span>
+      <span class="kw">type:</span> <span class="str">time</span>
+      <span class="kw">type_params:</span>
+        <span class="kw">time_granularity:</span> <span class="str">day</span>
+      <span class="kw">expr:</span> <span class="str">order_date</span>
+
+    <span class="kw">- name:</span> <span class="str">order_month</span>
+      <span class="kw">description:</span> <span class="str">"Order month"</span>
+      <span class="kw">type:</span> <span class="str">time</span>
+      <span class="kw">type_params:</span>
+        <span class="kw">time_granularity:</span> <span class="str">month</span>
+      <span class="kw">expr:</span> <span class="str">order_date</span>
+
+    <span class="kw">- name:</span> <span class="str">channel</span>
+      <span class="kw">description:</span> <span class="str">"Order channel"</span>
+      <span class="kw">type:</span> <span class="str">categorical</span>
+      <span class="kw">expr:</span> <span class="str">channel</span>
+
+    <span class="kw">- name:</span> <span class="str">status</span>
+      <span class="kw">description:</span> <span class="str">"Order status"</span>
+      <span class="kw">type:</span> <span class="str">categorical</span>
+      <span class="kw">expr:</span> <span class="str">status</span>
+
+  <span class="cmt"># ── Measures ──</span>
+  <span class="kw">measures:</span>
+    <span class="kw">- name:</span> <span class="str">total_amount</span>
+      <span class="kw">description:</span> <span class="str">"Total order amount"</span>
+      <span class="kw">label:</span> <span class="str">"Total Amount"</span>
+      <span class="kw">agg:</span> <span class="str">sum</span>
+      <span class="kw">expr:</span> <span class="str">amount</span>
+
+    <span class="kw">- name:</span> <span class="str">order_count</span>
+      <span class="kw">description:</span> <span class="str">"Total number of orders"</span>
+      <span class="kw">label:</span> <span class="str">"Order Count"</span>
+      <span class="kw">agg:</span> <span class="str">count</span>
+      <span class="kw">expr:</span> <span class="str">order_id</span>
+
+    <span class="kw">- name:</span> <span class="str">unique_customers</span>
+      <span class="kw">description:</span> <span class="str">"Distinct customers who placed orders"</span>
+      <span class="kw">label:</span> <span class="str">"Unique Customers"</span>
+      <span class="kw">agg:</span> <span class="str">count_distinct</span>
+      <span class="kw">expr:</span> <span class="str">user_id</span>
+
+    <span class="kw">- name:</span> <span class="str">avg_amount</span>
+      <span class="kw">description:</span> <span class="str">"Average order amount"</span>
+      <span class="kw">label:</span> <span class="str">"Avg Order Value"</span>
+      <span class="kw">agg:</span> <span class="str">average</span>
+      <span class="kw">expr:</span> <span class="str">amount</span>
+</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Companion: users and products tables</h3>
+
+<pre><span class="cmt"># models/users.yaml — users dimension table</span>
+<span class="kw">---</span>
+<span class="kw">semantic_model:</span>
+  <span class="kw">name:</span> <span class="str">users</span>
+  <span class="kw">description:</span> <span class="str">"User information dimension table"</span>
+  <span class="kw">db_table:</span> <span class="str">dw.users</span>
+  <span class="kw">defaults:</span>
+    <span class="kw">agg_time_dimension:</span> <span class="str">register_date</span>
+
+  <span class="kw">entities:</span>
+    <span class="kw">- name:</span> <span class="str">user_id</span>
+      <span class="kw">type:</span> <span class="str">primary</span>
+      <span class="kw">expr:</span> <span class="str">user_id</span>
+
+  <span class="kw">dimensions:</span>
+    <span class="kw">- name:</span> <span class="str">register_date</span>
+      <span class="kw">type:</span> <span class="str">time</span>
+      <span class="kw">type_params:</span>
+        <span class="kw">time_granularity:</span> <span class="str">day</span>
+    <span class="kw">- name:</span> <span class="str">city</span>
+      <span class="kw">type:</span> <span class="str">categorical</span>
+    <span class="kw">- name:</span> <span class="str">level</span>
+      <span class="kw">type:</span> <span class="str">categorical</span>
+
+  <span class="kw">measures:</span>
+    <span class="kw">- name:</span> <span class="str">user_count</span>
+      <span class="kw">agg:</span> <span class="str">count</span>
+      <span class="kw">expr:</span> <span class="str">user_id</span>
+</pre>
+
+<pre><span class="cmt"># models/products.yaml — products dimension table</span>
+<span class="kw">---</span>
+<span class="kw">semantic_model:</span>
+  <span class="kw">name:</span> <span class="str">products</span>
+  <span class="kw">description:</span> <span class="str">"Product information dimension table"</span>
+  <span class="kw">db_table:</span> <span class="str">dw.products</span>
+  <span class="kw">defaults:</span>
+    <span class="kw">agg_time_dimension:</span> <span class="str">order_date</span>
+
+  <span class="kw">entities:</span>
+    <span class="kw">- name:</span> <span class="str">product</span>
+      <span class="kw">type:</span> <span class="str">primary</span>
+      <span class="kw">expr:</span> <span class="str">product_id</span>
+
+  <span class="kw">dimensions:</span>
+    <span class="kw">- name:</span> <span class="str">order_date</span>
+      <span class="kw">type:</span> <span class="str">time</span>
+      <span class="kw">type_params:</span>
+        <span class="kw">time_granularity:</span> <span class="str">day</span>
+      <span class="kw">expr:</span> <span class="str">product_id</span>
+    <span class="kw">- name:</span> <span class="str">product_name</span>
+      <span class="kw">type:</span> <span class="str">categorical</span>
+
+  <span class="kw">measures:</span>
+    <span class="kw">- name:</span> <span class="str">product_count</span>
+      <span class="kw">agg:</span> <span class="str">count</span>
+      <span class="kw">expr:</span> <span class="str">product_id</span>
+</pre>
+</div>
+
+<!-- ════════════════ 8. ADVANCED METRICS ════════════════ -->
+<h2 id="advanced-metrics">8. Advanced metric definitions</h2>
+
+<div class="card">
+  <p>Besides the simple metrics auto-generated from <code>measures</code>, you can define <strong>advanced metrics</strong> with <code>metric:</code> documents. Advanced metrics combine existing measures or metrics to implement more complex computation logic. Four types are supported:</p>
+  <table>
+    <tr><th>Type</th><th>Meaning</th><th>Typical scenarios</th></tr>
+    <tr><td><code>ratio</code></td><td>Ratio metric: numerator ÷ denominator</td><td>Conversion rate, profit margin, share</td></tr>
+    <tr><td><code>derived</code></td><td>Derived metric: expression over existing metrics</td><td>MoM growth, YoY change, weighted calculations</td></tr>
+    <tr><td><code>cumulative</code></td><td>Cumulative metric: accumulation over a time window</td><td>Last-7-day sales, month-to-date signups</td></tr>
+    <tr><td><code>conversion</code></td><td>Conversion metric: conversion analysis between two events</td><td>Order conversion rate, signup conversion rate</td></tr>
+  </table>
+
+  <div class="box box-info" style="margin-top:16px;">
+    <strong>📄 File format:</strong> advanced metrics live in standalone YAML files with the top-level <code>metric:</code> (singular) instead of <code>semantic_model:</code>. One metric per file, or several separated by <code>---</code>.
+  </div>
+</div>
+
+<!-- ── Ratio ── -->
+<div class="card">
+  <h3 style="margin-top:0">8.1 Ratio metrics</h3>
+  <p>Computes the ratio of two metrics, e.g. conversion rate = orders / visits.</p>
+
+<pre><span class="cmt"># models/conversion_rate.yaml</span>
+<span class="kw">---</span>
+<span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">order_conversion_rate</span>
+  <span class="kw">description:</span> <span class="str">"Order conversion rate: orders / visits"</span>
+  <span class="kw">type:</span> <span class="str">ratio</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">numerator:</span> <span class="str">order_count</span>       <span class="cmt"># Numerator: references an existing metric</span>
+    <span class="kw">denominator:</span> <span class="str">visit_count</span>     <span class="cmt"># Denominator: references an existing metric</span>
+</pre>
+
+  <p><strong>Both numerator and denominator</strong> must be names of already-defined metrics (simple metrics or other advanced metrics).</p>
+</div>
+
+<!-- ── Derived ── -->
+<div class="card">
+  <h3 style="margin-top:0">8.2 Derived metrics</h3>
+  <p>Computed from one or more existing metrics via an expression. Most often used for <strong>MoM and YoY</strong> comparisons.</p>
+
+<pre><span class="cmt"># models/revenue_growth.yaml — MoM growth</span>
+<span class="kw">---</span>
+<span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">revenue_growth</span>
+  <span class="kw">description:</span> <span class="str">"Revenue MoM growth rate"</span>
+  <span class="kw">type:</span> <span class="str">derived</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">expr:</span> <span class="str">(current_revenue - prev_revenue) / prev_revenue</span>
+    <span class="kw">metrics:</span>
+      <span class="kw">- name:</span> <span class="str">total_amount</span>         <span class="cmt"># Current-period revenue</span>
+        <span class="kw">alias:</span> <span class="str">current_revenue</span>
+      <span class="kw">- name:</span> <span class="str">total_amount</span>         <span class="cmt"># Previous-period revenue (same metric, with offset)</span>
+        <span class="kw">alias:</span> <span class="str">prev_revenue</span>
+        <span class="kw">offset_window:</span> <span class="str">1 month</span>     <span class="cmt"># Shift back by one time window</span>
+</pre>
+
+  <table>
+    <tr><th>Parameter</th><th>Description</th></tr>
+    <tr><td><code>expr</code></td><td>Computation expression; references input metrics by their <code>alias</code></td></tr>
+    <tr><td><code>metrics</code></td><td>List of input metrics</td></tr>
+    <tr><td><code>name</code></td><td>Referenced metric name</td></tr>
+    <tr><td><code>alias</code></td><td>Alias used in <code>expr</code></td></tr>
+    <tr><td><code>offset_window</code></td><td>Time offset, e.g. <code>1 month</code>, <code>7 days</code>, <code>1 year</code></td></tr>
+    <tr><td><code>offset_to_grain</code></td><td>Granularity to offset to, e.g. <code>month</code>, <code>year</code></td></tr>
+  </table>
+</div>
+
+<!-- ── Cumulative ── -->
+<div class="card">
+  <h3 style="margin-top:0">8.3 Cumulative metrics</h3>
+  <p>Accumulates a metric over a time window, e.g. "last 7 days of sales".</p>
+
+<pre><span class="cmt"># models/weekly_sales.yaml</span>
+<span class="kw">---</span>
+<span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">weekly_sales</span>
+  <span class="kw">description:</span> <span class="str">"Sales over the last 7 days"</span>
+  <span class="kw">type:</span> <span class="str">cumulative</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">measure:</span>
+      <span class="kw">name:</span> <span class="str">total_amount</span>
+    <span class="kw">window:</span> <span class="str">7 days</span>          <span class="cmt"># Time window: the past 7 days</span>
+</pre>
+
+  <table>
+    <tr><th>Parameter</th><th>Description</th></tr>
+    <tr><td><code>measure</code></td><td>Referenced measure name (from some semantic_model's measures)</td></tr>
+    <tr><td><code>window</code></td><td>Time window format: <code>number granularity</code>, e.g. <code>28 days</code>, <code>4 weeks</code>, <code>3 months</code></td></tr>
+    <tr><td><code>grain_to_date</code></td><td>Optional. Accumulate up to the given grain, e.g. <code>month</code> (month-to-date), <code>year</code> (year-to-date)</td></tr>
+  </table>
+</div>
+
+<!-- ── Conversion ── -->
+<div class="card">
+  <h3 style="margin-top:0">8.4 Conversion metrics</h3>
+  <p>Measures the rate at which users convert from one event (base) to another (conversion). Commonly used to analyze <strong>user behavior funnels</strong>.</p>
+
+<pre><span class="cmt"># models/order_conversion.yaml</span>
+<span class="kw">---</span>
+<span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">visit_to_order_conversion</span>
+  <span class="kw">description:</span> <span class="str">"Conversion rate from visit to order"</span>
+  <span class="kw">type:</span> <span class="str">conversion</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">conversion_type_params:</span>
+      <span class="kw">base_measure:</span>                 <span class="cmt"># Base event (visit)</span>
+        <span class="kw">name:</span> <span class="str">visit_count</span>
+      <span class="kw">conversion_measure:</span>          <span class="cmt"># Conversion event (order)</span>
+        <span class="kw">name:</span> <span class="str">order_count</span>
+      <span class="kw">entity:</span> <span class="str">user</span>               <span class="cmt"># Linking entity: the dimension conversion is computed over</span>
+      <span class="kw">calculation:</span> <span class="str">conversion_rate</span>  <span class="cmt"># Calculation method</span>
+</pre>
+
+  <table>
+    <tr><th>Parameter</th><th>Description</th></tr>
+    <tr><td><code>base_measure</code></td><td>Measure name of the base event</td></tr>
+    <tr><td><code>conversion_measure</code></td><td>Measure name of the conversion event</td></tr>
+    <tr><td><code>entity</code></td><td>Linking entity name; conversion is computed over this dimension (usually user or session)</td></tr>
+    <tr><td><code>calculation</code></td><td><code>conversion_rate</code> or <code>conversions</code> (absolute conversion count)</td></tr>
+    <tr><td><code>window</code></td><td>Optional. Conversion window, e.g. <code>7 days</code></td></tr>
+  </table>
+</div>
+
+<!-- ════════════════ 9. COMMON PATTERNS ════════════════ -->
+<h2 id="common-patterns">9. Common patterns</h2>
+
+<div class="card">
+  <h3 style="margin-top:0">Pattern 1: One column as dimensions of different granularities</h3>
+  <p>A single date column can define day, week, and month dimensions at the same time:</p>
+<pre><span class="kw">dimensions:</span>
+  <span class="kw">- name:</span> <span class="str">order_date</span>
+    <span class="kw">type:</span> <span class="str">time</span>
+    <span class="kw">type_params:</span>
+      <span class="kw">time_granularity:</span> <span class="str">day</span>
+    <span class="kw">expr:</span> <span class="str">order_date</span>
+
+  <span class="kw">- name:</span> <span class="str">order_week</span>
+    <span class="kw">type:</span> <span class="str">time</span>
+    <span class="kw">type_params:</span>
+      <span class="kw">time_granularity:</span> <span class="str">week</span>
+    <span class="kw">expr:</span> <span class="str">order_date</span>        <span class="cmt"># Same column!</span>
+
+  <span class="kw">- name:</span> <span class="str">order_month</span>
+    <span class="kw">type:</span> <span class="str">time</span>
+    <span class="kw">type_params:</span>
+      <span class="kw">time_granularity:</span> <span class="str">month</span>
+    <span class="kw">expr:</span> <span class="str">order_date</span>        <span class="cmt"># Same column!</span>
+</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Pattern 2: Using SQL expressions</h3>
+  <p>When a column name is not intuitive enough, or a computed field is needed, use SQL expressions:</p>
+<pre><span class="kw">dimensions:</span>
+  <span class="kw">- name:</span> <span class="str">user_label</span>
+    <span class="kw">type:</span> <span class="str">categorical</span>
+    <span class="kw">expr:</span> <span class="str">concat(level, '_', city)</span>  <span class="cmt"># Concatenated field</span>
+
+<span class="kw">entities:</span>
+  <span class="kw">- name:</span> <span class="str">user_short_id</span>
+    <span class="kw">type:</span> <span class="str">foreign</span>
+    <span class="kw">expr:</span> <span class="str">substring(trace_id FROM 1 FOR 8)</span>  <span class="cmt"># Substring</span>
+
+<span class="kw">measures:</span>
+  <span class="kw">- name:</span> <span class="str">net_amount</span>
+    <span class="kw">agg:</span> <span class="str">sum</span>
+    <span class="kw">expr:</span> <span class="str">coalesce(amount, 0) - coalesce(discount, 0)</span>  <span class="cmt"># Computed field</span>
+</pre>
+  <div class="box box-ok">
+    <strong>✅ Supported:</strong> standard SQL functions such as <code>substring</code>, <code>concat</code>, <code>coalesce</code>, <code>cast</code>. These expressions are recognized automatically during physical validation and skip column-name checks.
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Pattern 3: Partitioned tables</h3>
+  <p>If the table has a partition column, mark it with <code>is_partition: true</code>:</p>
+<pre><span class="kw">dimensions:</span>
+  <span class="kw">- name:</span> <span class="str">ds</span>
+    <span class="kw">type:</span> <span class="str">time</span>
+    <span class="kw">type_params:</span>
+      <span class="kw">time_granularity:</span> <span class="str">day</span>
+    <span class="kw">is_partition:</span> <span class="kw">true</span>              <span class="cmt"># Mark as partition column</span>
+    <span class="kw">expr:</span> <span class="str">ds</span>
+</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Pattern 4: Hiding internal measures</h3>
+  <p>Some measures are only meant for intermediate computation and should not be exposed to end users — set <code>create_metric: false</code>:</p>
+<pre><span class="kw">measures:</span>
+  <span class="kw">- name:</span> <span class="str">total_amount</span>            <span class="cmt"># ✅ Public metric</span>
+    <span class="kw">agg:</span> <span class="str">sum</span>
+    <span class="kw">expr:</span> <span class="str">amount</span>
+
+  <span class="kw">- name:</span> <span class="str">_raw_count</span>              <span class="cmt"># ❌ Not exposed</span>
+    <span class="kw">agg:</span> <span class="str">count</span>
+    <span class="kw">expr:</span> <span class="str">order_id</span>
+    <span class="kw">create_metric:</span> <span class="kw">false</span>
+</pre>
+</div>
+<!-- ════════════════ 11. ADVANCED FEATURES ════════════════ -->
+<h2 id="advanced-features">10. Advanced features</h2>
+
+<!-- ── Filters ── -->
+<div class="card">
+  <h3 style="margin-top:0">10.1 Filters</h3>
+  <p>SQL filter conditions can be added to <strong>measure definitions</strong> or <strong>metric definitions</strong>. Filters are applied before aggregation.</p>
+
+<div class="box box-info">
+  <strong>📍 Where filters can go:</strong>
+  <ul style="padding-left:20px; margin-top:8px;">
+    <li>The <code>filter:</code> field of <code>measures</code> — limits the data range of a single measure</li>
+    <li>The <code>filter:</code> field of a <code>metric:</code> — limits the data range of the whole metric</li>
+    <li><code>input_measures[].filter:</code> on a measure — limits the measure referenced in an advanced metric</li>
+  </ul>
+</div>
+
+<pre><span class="cmt"># Example 1: measure-level filter — only sum amounts of "completed" orders</span>
+<span class="kw">measures:</span>
+  <span class="kw">- name:</span> <span class="str">completed_amount</span>
+    <span class="kw">description:</span> <span class="str">"Sum of amounts of completed orders"</span>
+    <span class="kw">agg:</span> <span class="str">sum</span>
+    <span class="kw">expr:</span> <span class="str">amount</span>
+    <span class="kw">filter:</span> <span class="str">{{ render_dimension_template('status') }} = 'completed'</span>
+</pre>
+
+<pre><span class="cmt"># Example 2: metric-level filter</span>
+<span class="kw">---</span>
+<span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">premium_user_orders</span>
+  <span class="kw">description:</span> <span class="str">"Number of orders from premium users"</span>
+  <span class="kw">type:</span> <span class="str">simple</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">measure:</span>
+      <span class="kw">name:</span> <span class="str">order_count</span>
+      <span class="kw">filter:</span> <span class="str">{{ render_dimension_template('user_level') }} = 'premium'</span>
+</pre>
+
+  <div class="box box-warn">
+    <strong>⚠️ Filter syntax:</strong>
+    <ul style="padding-left:20px; margin-top:6px;">
+      <li>Reference dimensions in YAML with <code>{{ Dimension('qualified_name') }}</code> or <code>{{ render_dimension_template('dimension_name') }}</code></li>
+      <li>Reference entities with <code>{{ Entity('entity_name') }}</code> or <code>{{ render_entity_template('entity_name') }}</code></li>
+      <li>Follow with a plain SQL condition, e.g. <code>= 'value'</code>, <code>IN ('a', 'b')</code></li>
+      <li>The <code>where</code> parameter of <code>query_metric</code> accepts raw SQL directly (e.g. <code>"channel = 'APP'"</code>); the compiler automatically converts it to MetricFlow template syntax</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── Saved Queries ── -->
+<div class="card">
+  <h3 style="margin-top:0">10.2 Saved queries</h3>
+  <p>Save a common <strong>metric + grouping + filter</strong> combination as a query template that users can call directly.</p>
+
+<pre><span class="cmt"># models/weekly_report.yaml</span>
+<span class="kw">---</span>
+<span class="kw">saved_query:</span>
+  <span class="kw">name:</span> <span class="str">weekly_revenue_report</span>
+  <span class="kw">description:</span> <span class="str">"Weekly revenue report: total order amount and order count by channel"</span>
+  <span class="kw">label:</span> <span class="str">"Weekly Revenue Report"</span>
+  <span class="kw">query_params:</span>
+    <span class="kw">metrics:</span>
+      <span class="kw">- total_amount</span>
+      <span class="kw">- order_count</span>
+    <span class="kw">group_by:</span>
+      <span class="kw">- order_id__order_week</span>      <span class="cmt"># Group by week</span>
+      <span class="kw">- order_id__channel</span>         <span class="cmt"># Group by channel</span>
+    <span class="kw">order_by:</span>
+      <span class="kw">- "-order_id__order_week"</span>  <span class="cmt"># Week descending</span>
+    <span class="kw">limit:</span> <span class="num">52</span>
+</pre>
+
+  <table>
+    <tr><th>Field</th><th>Description</th></tr>
+    <tr><td><code>metrics</code></td><td>List of metric names to query</td></tr>
+    <tr><td><code>group_by</code></td><td>Grouping dimensions. Format: <code>entity_name__dimension_name</code> (double underscore)</td></tr>
+    <tr><td><code>order_by</code></td><td>Ordering; a <code>-</code> prefix means descending</td></tr>
+    <tr><td><code>where</code></td><td>Filter conditions (same syntax as filters)</td></tr>
+    <tr><td><code>limit</code></td><td>Maximum rows returned</td></tr>
+  </table>
+
+  <div class="box box-ok">
+    <strong>💡 Dimension reference format:</strong> <code>entity_name__dimension_name</code> (double underscore). For example, <code>order_id__order_date</code> refers to the order_date dimension in the orders table.
+  </div>
+</div>
+
+<!-- ── Non-additive / SCD ── -->
+<div class="card">
+  <h3 style="margin-top:0">10.3 Non-additive measures &amp; slowly changing dimensions (SCD Type II)</h3>
+  <p>Some measures <strong>cannot simply be summed</strong> (e.g. inventory levels, account balances) and need a snapshot value at a specific dimension.</p>
+
+<pre><span class="cmt"># Non-additive measure: inventory level (month-end snapshot)</span>
+<span class="kw">measures:</span>
+  <span class="kw">- name:</span> <span class="str">monthly_inventory</span>
+    <span class="kw">description:</span> <span class="str">"Month-end inventory level"</span>
+    <span class="kw">agg:</span> <span class="str">sum</span>
+    <span class="kw">expr:</span> <span class="str">inventory_count</span>
+    <span class="kw">non_additive_dimension:</span>
+      <span class="kw">name:</span> <span class="str">snapshot_date</span>       <span class="cmt"># Non-additive dimension</span>
+      <span class="kw">window_choice:</span> <span class="str">max</span>        <span class="cmt"># Take the maximum value within the time window</span>
+      <span class="kw">window_groupings:</span>
+        <span class="kw">- product</span>                <span class="cmt"># Snapshot grouped by product</span>
+</pre>
+
+  <p><strong>SCD Type II (slowly changing dimensions):</strong> when a dimension table has an effective time range, mark the start and end dimensions:</p>
+
+<pre><span class="cmt"># Marking SCD Type II in a dimension table</span>
+<span class="kw">dimensions:</span>
+  <span class="kw">- name:</span> <span class="str">valid_from</span>
+    <span class="kw">description:</span> <span class="str">"Effective start time"</span>
+    <span class="kw">type:</span> <span class="str">time</span>
+    <span class="kw">type_params:</span>
+      <span class="kw">time_granularity:</span> <span class="str">day</span>
+      <span class="kw">validity_params:</span>
+        <span class="kw">is_start:</span> <span class="kw">true</span>              <span class="cmt"># Mark as start time</span>
+
+  <span class="kw">- name:</span> <span class="str">valid_to</span>
+    <span class="kw">description:</span> <span class="str">"Effective end time"</span>
+    <span class="kw">type:</span> <span class="str">time</span>
+    <span class="kw">type_params:</span>
+      <span class="kw">time_granularity:</span> <span class="str">day</span>
+      <span class="kw">validity_params:</span>
+        <span class="kw">is_end:</span> <span class="kw">true</span>                <span class="cmt"># Mark as end time</span>
+</pre>
+</div>
+
+<!-- ── Timespine / Fill Nulls ── -->
+<div class="card">
+  <h3 style="margin-top:0">10.4 Null filling &amp; time-axis alignment</h3>
+
+<pre><span class="cmt"># Turn NULL into 0 (useful for count-type metrics to show 0 on days with no data)</span>
+<span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">daily_orders</span>
+  <span class="kw">type:</span> <span class="str">simple</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">measure:</span>
+      <span class="kw">name:</span> <span class="str">order_count</span>
+    <span class="kw">fill_nulls_with:</span> <span class="num">0</span>         <span class="cmt"># Show 0 on days with no data</span>
+    <span class="kw">join_to_timespine:</span> <span class="kw">true</span>   <span class="cmt"># Align to the time spine (fill in days with no data)</span>
+</pre>
+
+  <table>
+    <tr><th>Parameter</th><th>Description</th></tr>
+    <tr><td><code>fill_nulls_with</code></td><td>Replace NULL in the aggregate result with the given value (usually 0)</td></tr>
+    <tr><td><code>join_to_timespine</code></td><td>Join the metric result with the time spine table so every day/month/year has a row (days without data get NULL or 0)</td></tr>
+  </table>
+</div>
+
+<!-- ── Native Format ── -->
+<div class="card">
+  <h3 style="margin-top:0">10.5 Native table reference format</h3>
+  <p>Besides the <code>db_table</code> shorthand, MetricFlow's native <code>node_relation</code> format is also supported, including three-part catalog references:</p>
+
+<pre><span class="cmt"># Two-part: schema.table</span>
+<span class="kw">node_relation:</span>
+  <span class="kw">schema_name:</span> <span class="str">dw</span>
+  <span class="kw">alias:</span> <span class="str">orders</span>
+
+<span class="cmt"># Three-part: catalog.schema.table</span>
+<span class="kw">node_relation:</span>
+  <span class="kw">database:</span> <span class="str">catalog</span>
+  <span class="kw">schema_name:</span> <span class="str">dw</span>
+  <span class="kw">alias:</span> <span class="str">orders</span>
+
+<span class="cmt"># db_table also supports the three-part form</span>
+<span class="kw">db_table:</span> <span class="str">catalog.dw.orders</span>
+</pre>
+</div>
+
+<!-- ── Cumulative PeriodAgg ── -->
+<div class="card">
+  <h3 style="margin-top:0">10.6 Aggregation modes for cumulative metrics</h3>
+  <p>Cumulative metrics support three <code>period_agg</code> modes controlling the aggregation behavior within the time window:</p>
+
+<pre><span class="cmt"># last: take the value of the last day in the window (default behavior)</span>
+<span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">end_of_week_inventory</span>
+  <span class="kw">type:</span> <span class="str">cumulative</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">cumulative_type_params:</span>
+      <span class="kw">measure:</span>
+        <span class="kw">name:</span> <span class="str">inventory_count</span>
+      <span class="kw">window:</span> <span class="str">7 days</span>
+      <span class="kw">period_agg:</span> <span class="str">last</span>       <span class="cmt"># Take the last day's value</span>
+
+<span class="cmt"># average: daily average within the window</span>
+      <span class="kw">period_agg:</span> <span class="str">average</span>    <span class="cmt"># 7-day average</span>
+
+<span class="cmt"># first: take the value of the first day in the window</span>
+      <span class="kw">period_agg:</span> <span class="str">first</span>      <span class="cmt"># Take the first day's value</span>
+</pre>
+
+  <table>
+    <tr><th><code>period_agg</code></th><th>Description</th></tr>
+    <tr><td><code>last</code></td><td>Value of the last day in the window (default)</td></tr>
+    <tr><td><code>average</code></td><td>Daily average within the window</td></tr>
+    <tr><td><code>first</code></td><td>Value of the first day in the window</td></tr>
+  </table>
+</div>
+
+<!-- ── Conversion Constant Properties ── -->
+<div class="card">
+  <h3 style="margin-top:0">10.7 Constant properties of conversion metrics</h3>
+  <p>In a conversion metric, <code>constant_properties</code> specifies properties that must stay the same between the two events:</p>
+
+<pre><span class="cmt"># Analyze conversion by "traffic source", requiring the source to be identical across both events</span>
+<span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">visit_to_order_by_source</span>
+  <span class="kw">type:</span> <span class="str">conversion</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">conversion_type_params:</span>
+      <span class="kw">base_measure:</span>
+        <span class="kw">name:</span> <span class="str">visit_count</span>
+      <span class="kw">conversion_measure:</span>
+        <span class="kw">name:</span> <span class="str">order_count</span>
+      <span class="kw">entity:</span> <span class="str">user</span>
+      <span class="kw">constant_properties:</span>
+        <span class="kw">- base_property:</span> <span class="str">order_id__channel</span>    <span class="cmt"># Property of the base event</span>
+          <span class="kw">conversion_property:</span> <span class="str">order_id__channel</span> <span class="cmt"># Property of the conversion event (must match)</span>
+</pre>
+</div>
+
+<!-- ── Metric Time Granularity + Offset to Grain ── -->
+<div class="card">
+  <h3 style="margin-top:0">10.8 Metric time granularity &amp; offset to grain</h3>
+
+  <p><strong>Metric-level time_granularity:</strong> specify the time granularity directly in a metric definition (overriding the query-time default behavior):</p>
+<pre><span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">monthly_revenue</span>
+  <span class="kw">type:</span> <span class="str">simple</span>
+  <span class="kw">time_granularity:</span> <span class="str">month</span>     <span class="cmt"># This metric aggregates by month by default</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">measure:</span>
+      <span class="kw">name:</span> <span class="str">total_amount</span>
+</pre>
+
+  <p><strong>offset_to_grain:</strong> in derived metrics, align the offset to the given grain (instead of the default day level):</p>
+<pre><span class="kw">metric:</span>
+  <span class="kw">name:</span> <span class="str">yoy_growth</span>
+  <span class="kw">type:</span> <span class="str">derived</span>
+  <span class="kw">type_params:</span>
+    <span class="kw">expr:</span> <span class="str">(current - prev) / prev</span>
+    <span class="kw">metrics:</span>
+      <span class="kw">- name:</span> <span class="str">total_amount</span>
+        <span class="kw">alias:</span> <span class="str">current</span>
+      <span class="kw">- name:</span> <span class="str">total_amount</span>
+        <span class="kw">alias:</span> <span class="str">prev</span>
+        <span class="kw">offset_window:</span> <span class="str">1 year</span>
+        <span class="kw">offset_to_grain:</span> <span class="str">month</span>    <span class="cmt"># Offset to month grain (instead of day)</span>
+</pre>
+</div>
+
+<!-- ── Entity Role ── -->
+<div class="card">
+  <h3 style="margin-top:0">10.9 Entity roles</h3>
+  <p>The same entity (e.g. <code>user_id</code>) may play multiple roles in a table. In an orders table, for example, <code>user_id</code> is both the "buyer" and the "referrer". Distinguish them with <code>role</code>:</p>
+
+<pre><span class="kw">entities:</span>
+  <span class="kw">- name:</span> <span class="str">user</span>
+    <span class="kw">type:</span> <span class="str">foreign</span>
+    <span class="kw">expr:</span> <span class="str">buyer_id</span>
+    <span class="kw">role:</span> <span class="str">buyer</span>              <span class="cmt"># This user entity's role is "buyer"</span>
+
+  <span class="kw">- name:</span> <span class="str">user</span>
+    <span class="kw">type:</span> <span class="str">foreign</span>
+    <span class="kw">expr:</span> <span class="str">referrer_id</span>
+    <span class="kw">role:</span> <span class="str">referrer</span>           <span class="cmt"># This user entity's role is "referrer"</span>
+</pre>
+
+  <p>When <code>role</code> is not specified, the default role equals the entity name.</p>
+</div>
+<!-- ════════════════ 11. BEST PRACTICES ════════════════ -->
+<h2 id="best-practices">11. Best practices</h2>
+
+<div class="card">
+  <ol style="padding-left:20px;">
+    <li>
+      <strong>One file per table.</strong>
+      Name files <code>table_name.yaml</code> for a clear, maintainable structure.
+      <br>✅ <code>orders.yaml</code>, <code>users.yaml</code>, <code>products.yaml</code>
+    </li>
+    <li style="margin-top:12px;">
+      <strong>Define entities first, then dimensions, then measures.</strong>
+      Entities are the skeleton of a semantic model, dimensions are its grouping ability, and measures are the query targets. Writing in this order avoids omissions.
+    </li>
+    <li style="margin-top:12px;">
+      <strong>Write a <code>description</code> for every measure.</strong>
+      End users see metric names and descriptions. Good descriptions let them understand a metric without reading the YAML.
+    </li>
+    <li style="margin-top:12px;">
+      <strong>The same time column can define dimensions of multiple grains.</strong>
+      For example, the <code>order_date</code> column can have day, week, month, quarter, and year granularities at once.
+    </li>
+    <li style="margin-top:12px;">
+      <strong>Use meaningful business names for foreign key entities.</strong>
+      The entity name <code>customer</code> is easier to understand than <code>user_id</code> — it represents the "customer" concept, not just the "user_id column".
+    </li>
+    <li style="margin-top:12px;">
+      <strong>Validate first, then commit.</strong>
+      After every YAML change, click <strong>💡 Validate</strong>. The system verifies table existence, column-name correctness, and naming rules. Commit only after seeing a green pass.
+    </li>
+    <li style="margin-top:12px;">
+      <strong>Measure names must be unique within a model.</strong>
+      Measure names may repeat across different models, but that causes metric overriding — so keeping them globally unique is best.
+    </li>
+  </ol>
+</div>
+
+<!-- ════════════════ 10. ERRORS ════════════════ -->
+<h2 id="errors">12. Common errors &amp; troubleshooting</h2>
+
+<div class="card">
+  <table>
+    <tr><th>Error message</th><th>Cause</th><th>Solution</th></tr>
+    <tr>
+      <td><code>Table xxx does not exist</code></td>
+      <td>The table referenced by <code>db_table</code> does not exist</td>
+      <td>Check the table name spelling; confirm both the database and table names are correct</td>
+    </tr>
+    <tr>
+      <td><code>measure references missing column: dw.orders.xxx</code></td>
+      <td>The column named in the measure does not exist in the table</td>
+      <td>Check that <code>expr</code> matches the actual column name (mind the case)</td>
+    </tr>
+    <tr>
+      <td><code>entity references missing column</code></td>
+      <td>The entity's <code>expr</code> column does not exist</td>
+      <td>Same as above; for SQL expressions (e.g. <code>substring(...) </code>), confirm the function and column names are correct</td>
+    </tr>
+    <tr>
+      <td><code>Duplicate measure 'xxx' defined in 2 models</code></td>
+      <td>Two models define a measure with the same name</td>
+      <td>Rename one of the measures to keep names globally unique</td>
+    </tr>
+    <tr>
+      <td><code>Duplicate semantic_model name</code></td>
+      <td>Two files use the same model name</td>
+      <td>Rename one of the models</td>
+    </tr>
+    <tr>
+      <td><code>Did not find exactly one project configuration</code></td>
+      <td>Missing <code>project.yaml</code></td>
+      <td>Create a project.yaml containing <code>time_config</code></td>
+    </tr>
+    <tr>
+      <td><code>'xxx' does not match '^(?!.*__)...$'</code></td>
+      <td>Naming violates the rules</td>
+      <td>Start with a lowercase letter, remove double underscores, and use at least 2 characters</td>
+    </tr>
+    <tr>
+      <td><code>No staging changes to validate</code></td>
+      <td>There are no pending changes to validate</td>
+      <td>Upload/modify YAML files first, then click Validate</td>
+    </tr>
+  </table>
+</div>
+
+<div class="box box-info" style="margin-top:24px;">
+  <strong>🔍 Quick troubleshooting steps:</strong>
+  <ol style="padding-left:20px; margin-top:8px;">
+    <li>Confirm the table exists in VeloDB: <code>DESCRIBE dw.orders</code></li>
+    <li>Confirm column names match exactly, including case</li>
+    <li>Check YAML indentation (spaces only — no tabs)</li>
+    <li>Confirm all names follow the lowercase-initial rule</li>
+  </ol>
+</div>
+
+<!-- ════════════════ 13. VELODB-MCP MANAGEMENT ════════════════ -->
+<h2 id="velodb-mcp">13. Semantic model management in velodb-mcp</h2>
+
+<div class="card">
+  <h3 style="margin-top:0">13.1 Workspaces</h3>
+  <p>A workspace is an <strong>isolated container</strong> for semantic models. Each workspace has its own:</p>
+  <ul style="padding-left:20px; margin:8px 0;">
+    <li>Model files (YAML definitions)</li>
+    <li>Metric list (<code>list_metrics</code> only shows metrics in this workspace)</li>
+    <li>Query engine instance (MetricFlow compiler)</li>
+    <li>VeloDB connection pool</li>
+  </ul>
+  <p>Metrics in workspace A are <strong>completely invisible</strong> to workspace B. Suitable for dividing by team, project, or environment.</p>
+
+  <div class="box box-info">
+    <strong>📌 Naming rules:</strong> workspace names must start with a letter and may contain only letters, digits, and underscores. E.g. <code>marketing</code>, <code>finance_v2</code>.
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">13.2 The three workspace states</h3>
+  <p>Call <code>check_service_health</code> to view the runtime status of each workspace. A workspace is always in one of these three states:</p>
+
+  <table>
+    <tr><th>State</th><th>Icon</th><th>Meaning</th><th>Trigger</th></tr>
+    <tr>
+      <td><strong>healthy</strong></td>
+      <td>🟢</td>
+      <td>Running normally. Semantic models loaded successfully; metrics are queryable.</td>
+      <td>YAML files committed, bootstrap parsing succeeded, MetricFlow engine ready.</td>
+    </tr>
+    <tr>
+      <td><strong>no_models</strong></td>
+      <td>⚪</td>
+      <td>Empty workspace. No YAML files uploaded yet.</td>
+      <td>A newly created workspace, or all files have been deleted.</td>
+    </tr>
+    <tr>
+      <td><strong>not_ready</strong></td>
+      <td>🔴</td>
+      <td>Load failed. Files exist but cannot be compiled into a semantic manifest.</td>
+      <td>YAML syntax errors, missing tables, missing project.yaml, MetricFlow validation failures, etc. Check the <code>validate</code> error message.</td>
+    </tr>
+  </table>
+
+  <div style="text-align:center; margin:20px 0;">
+    <pre style="display:inline-block; text-align:left;">
+  ┌──────────────┐   upload YAML    ┌──────────────┐   commit OK       ┌──────────────┐
+  │  no_models   │ ──────────────→ │  not_ready   │ ───────────────→ │   healthy    │
+  │  (empty)     │                 │  (needs fix) │                  │  (running)   │
+  └──────────────┘                 └──────────────┘                  └──────────────┘
+                                         ↑                                  │
+                                         │       upload broken YAML         │
+                                         └──────────────────────────────────┘
+    </pre>
+  </div>
+
+  <div class="box box-info">
+    <strong>📊 Version tracking:</strong> after every reload the system records the version number, metric count, and whether loading succeeded. Use the <code>metric_count</code> returned by <code>check_service_health</code> to confirm the number of currently loaded metrics.
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">13.3 Active Store and Staging Store</h3>
+  <p>Each workspace has two storage layers inside:</p>
+  <table>
+    <tr><th>Layer</th><th>Table name</th><th>Purpose</th></tr>
+    <tr><td><strong>Active Store</strong><br>(live)</td><td><code>active_store_{workspace}</code></td><td>Committed and loaded models. The query engine uses this version. Files are <strong>read-only</strong>.</td></tr>
+    <tr><td><strong>Staging Store</strong><br>(pending)</td><td><code>staging_store_{workspace}</code></td><td>Pending changes uploaded or edited by users. Supports add/edit/delete. <strong>After passing validation, they are committed</strong> into Active.</td></tr>
+  </table>
+
+  <div style="text-align:center; margin:16px 0;">
+    <pre style="display:inline-block; text-align:left;">
+   Staging Store               Active Store
+  ┌─────────────┐   commit    ┌─────────────┐
+  │ edit / add  │ ─────────→ │  query use  │
+  │ validate ✓  │            │  read-only  │
+  │ discard  ✗  │            │             │
+  └─────────────┘            └─────────────┘
+       ↑                          ↑
+   user edits               used by the query engine
+    </pre>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">13.4 Update flow</h3>
+  <p>Semantic model updates follow the <strong>edit → validate → commit → auto reload</strong> flow:</p>
+
+  <table>
+    <tr><th>Step</th><th>Action</th><th>Description</th></tr>
+    <tr><td>1</td><td>Upload/edit YAML</td><td>Files enter the Staging Store (running queries are not affected)</td></tr>
+    <tr><td>2</td><td>💡 <strong>Validate</strong></td><td>Mandatory! The system automatically checks: table existence, column-name correctness, YAML syntax, MetricFlow semantic rules, naming rules, cross-model duplicate names</td></tr>
+    <tr><td>3</td><td>🚀 <strong>Commit</strong></td><td>Staging → Active. The system automatically triggers an engine reload (no manual restart needed)</td></tr>
+    <tr><td>4</td><td>⟳ Auto reload</td><td>A background thread parses the new models, compiles the JSON manifest, and updates the function routing. Usually completes in 2-5 seconds</td></tr>
+  </table>
+
+  <div class="box box-warn">
+    <strong>⚠️ Validate before commit:</strong> a Staging set that has not been validated is rejected by Commit with <code>"Staging must be validated before commit"</code>.
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">13.5 Permission model</h3>
+  <p>Only <strong>admin</strong> users can manage semantic models:</p>
+  <table>
+    <tr><th>Operation</th><th>admin</th><th>Regular user</th></tr>
+    <tr><td>View semantic models</td><td>✅</td><td>✅</td></tr>
+    <tr><td>Query metrics (<code>query_metric</code>)</td><td>✅</td><td>✅</td></tr>
+    <tr><td>List metrics (<code>list_metrics</code>)</td><td>✅</td><td>✅</td></tr>
+    <tr><td>Upload/edit/delete YAML</td><td>✅</td><td>❌</td></tr>
+    <tr><td>Validate / Commit / Discard</td><td>✅</td><td>❌</td></tr>
+    <tr><td>Create/delete workspaces</td><td>✅</td><td>❌</td></tr>
+    <tr><td>Execute SQL (<code>execute_query</code>)</td><td>✅</td><td>✅ (restricted)</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">13.6 The default example workspace</h3>
+  <p>On first startup, the system can create an <code>example</code> workspace with complete seed data:</p>
+
+  <table>
+    <tr><th>Content</th><th>Description</th></tr>
+    <tr><td><code>dw.orders</code></td><td>Orders table (12 rows of mock data) with order_id, user_id, product_id, amount, channel, status, order_date</td></tr>
+    <tr><td><code>dw.users</code></td><td>Users table (5 rows of mock data) with user_id, name, city, level, register_date</td></tr>
+    <tr><td><code>dw.products</code></td><td>Products table (5 rows of mock data) with product_id, name, category, brand, price</td></tr>
+    <tr><td><code>dw.dim_date</code></td><td>Date dimension table (calendar), used for time-axis alignment and cumulative calculations</td></tr>
+    <tr><td>Semantic model YAML</td><td>orders.yaml, users.yaml, products.yaml + project.yaml (auto-injected into active_store_example)</td></tr>
+  </table>
+
+  <p>Example metrics include: <code>total_amount</code> (total order amount), <code>order_count</code> (order count), <code>avg_amount</code> (average order value), <code>unique_users</code> (unique users) from the orders model; <code>user_count</code> (user count) from the users model.</p>
+  <p>The example data is not deployed automatically; an admin should deploy it manually in the WebUI.</p>
+</div>
+
+<!-- ════════════════ 14. WEBUI & CLI ════════════════ -->
+<h2 id="webui-cli">14. Usage: WebUI &amp; CLI</h2>
+
+<div class="card">
+  <h3 style="margin-top:0">14.1 WebUI (browser interface)</h3>
+  <p>Visit <code>http://&lt;server-address&gt;:&lt;port&gt;/mcp/web</code> and log in to use the graphical management interface:</p>
+
+  <table>
+    <tr><th>Page</th><th>URL</th><th>Function</th></tr>
+    <tr><td>Login</td><td><code>/mcp/web/login</code></td><td>Log in with a VeloDB account (admin:admin is the default administrator)</td></tr>
+    <tr><td>Home</td><td><code>/mcp/web</code></td><td>Workspace list; switch, create, and delete workspaces</td></tr>
+    <tr><td>Model management</td><td><code>/mcp/web/models?workspace=xxx</code></td><td>View Active and Staging file lists; edit, upload, delete</td></tr>
+    <tr><td>File editor</td><td><code>/mcp/web/{filename}?workspace=xxx</code></td><td>Edit YAML files online</td></tr>
+  </table>
+
+  <p><strong>Key action buttons (admin only):</strong></p>
+  <table>
+    <tr><th>Button</th><th>Action</th></tr>
+    <tr><td>💡 <strong>Validate</strong></td><td>Validate all changes in Staging (physical checks + semantic checks + duplicate detection)</td></tr>
+    <tr><td>🚀 <strong>Commit</strong></td><td>Commit validated Staging changes into Active and trigger an engine reload</td></tr>
+    <tr><td>🗑 <strong>Discard</strong></td><td>Discard all changes in Staging and revert to the Active version</td></tr>
+    <tr><td>⟳ <strong>Reload</strong></td><td>Manually trigger an engine reload (normally automatic after Commit)</td></tr>
+    <tr><td>+ <strong>New</strong></td><td>Create a new YAML file</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">14.2 CLI (command-line client)</h3>
+  <p>velodb-mcp-client is an independently deployed command-line client that connects to the MCP Server via a Bearer token. All commands (tool + semantic) use Bearer authentication uniformly.</p>
+
+  <p><strong>MCP Tool calls:</strong></p>
+<pre><span class="cmt"># List all metrics</span>
+velodb-mcp-client tool call list_metrics --json '{"workspace":"example"}'
+
+<span class="cmt"># Query a metric (total order amount by month)</span>
+velodb-mcp-client tool call query_metric --json \
+  '{"workspace":"example","metrics":["total_amount"],"group_by":["order_month"]}'
+
+<span class="cmt"># View the dimensions available for a metric</span>
+velodb-mcp-client tool call list_dimensions_for_metric --json \
+  '{"workspace":"example","metric_name":"total_amount"}'
+
+<span class="cmt"># Execute raw SQL</span>
+velodb-mcp-client tool call execute_query --arg sql="SELECT * FROM dw.orders LIMIT 5"
+
+<span class="cmt"># Health check + view all workspace states</span>
+velodb-mcp-client tool call check_service_health
+velodb-mcp-client semantic status</pre>
+
+  <p><strong>Semantic model management:</strong></p>
+<pre><span class="cmt"># List all model files in a workspace</span>
+velodb-mcp-client semantic list -w example
+
+<span class="cmt"># Upload YAML to staging</span>
+velodb-mcp-client semantic push ./models -w example
+
+<span class="cmt"># Pull the active models locally</span>
+velodb-mcp-client semantic pull -o ./backup -w example
+
+<span class="cmt"># Edit a model file online</span>
+velodb-mcp-client semantic edit orders.yaml -w example
+
+<span class="cmt"># Trigger a semantic layer reload</span>
+velodb-mcp-client semantic reload -w example</pre>
+
+  <div class="box box-ok">
+    <strong>🔌 MCP integration:</strong> add the following to your AI tool's configuration (e.g. Claude Desktop):
+    <pre style="margin-top:8px;">{
+  "mcpServers": {
+    "velodb": {
+      "url": "http://&lt;server&gt;:&lt;port&gt;/mcp",
+      "transport": "streamable-http",
+      "headers": { "Authorization": "Bearer admin:admin" }
+    }
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- ════════════════ FOOTER ════════════════ -->
+<div style="text-align:center; margin-top:48px; padding:24px; color:var(--muted); font-size:.9rem; border-top:1px solid var(--border);">
+  <p>Based on MetricFlow v0.209.0 · VeloDB adaptation · velodb-mcp-server 0.2.0</p>
+</div>
+
+</div>
+</section>
+<section id="panel-server" class="doc-panel" role="tabpanel" aria-labelledby="tab-server">
+<header>
+  <h1>VeloDB MCP User Guide</h1>
+  <p>Connect AI agents (Claude Code / Codex), manage semantic models from the command line, and query data in natural language</p>
+</header>
+<div class="container">
+<div class="toc">
+    <h3>Contents</h3>
+    <ul>
+      <li><a href="#server-connect-ai-agent">1. Connect an AI agent (Claude Code / Cursor / Codex)</a>
+        <ul style="padding-left:16px; font-size:.82rem;">
+          <li><a href="#server-connect-ai-agent">1.1 Connect Claude Code</a></li>
+          <li><a href="#server-connect-ai-agent">1.2 Connect Cursor / VS Code</a></li>
+          <li><a href="#server-connect-ai-agent">1.3 Available tools at a glance</a></li>
+          <li><a href="#server-connect-ai-agent">1.4 Recommended agent workflow</a></li>
+          <li><a href="#server-connect-ai-agent">1.5 Conversation examples</a></li>
+        </ul>
+      </li>
+      <li><a href="#server-cli-tools">2. CLI command-line tool</a></li>
+      <li><a href="#server-query-capabilities">3. Available query capabilities</a></li>
+      <li><a href="#server-query-examples">4. Query examples</a></li>
+      <li><a href="#server-faq">5. FAQ</a></li>
+    </ul>
+  </div>
+
+<blockquote>
+<p><strong>You are a VeloDB user</strong>. The administrator has already deployed the MCP Server for you. You only need to know:
+1. How to connect the service to an AI agent (Claude Code / Codex)
+2. How to manage semantic models with the CLI
+3. How to query data through AI conversations</p>
+</blockquote>
+<hr />
+<h2 id="server-connect-ai-agent">1. Connect an AI agent (Claude Code / Cursor / Codex)</h2>
+
+<div class="card" style="background:#f0f7ff; border-left:4px solid #1a73e8;">
+  <p><strong>📋 Before you start — get these from your administrator:</strong></p>
+  <ul style="padding-left:20px; margin:8px 0;">
+    <li><strong>MCP Server address</strong>: <code>http://&lt;IP&gt;:&lt;port&gt;</code> (default port 3000)</li>
+    <li><strong>VeloDB username/password</strong>: for authentication (format <code>username:password</code>, e.g. <code>admin:admin</code>)</li>
+    <li><strong>Workspace name</strong>: the workspace holding the semantic models (default <code>example</code>)</li>
+  </ul>
+</div>
+
+<h3>1.1 Connect Claude Code</h3>
+<p><strong>Step 1: Add the MCP Server</strong></p>
+<pre><code>claude mcp add --transport http velodb http://&lt;MCP-Server-address&gt;:&lt;port&gt;/mcp \
+  --header "Authorization: Bearer admin:admin"</code></pre>
+
+<p><strong>Step 2: Verify the connection</strong></p>
+<p>Type in the Claude Code conversation:</p>
+<blockquote>
+<p>check the service health status</p>
+</blockquote>
+<p>The AI will automatically call <code>check_service_health</code>, returning the VeloDB connection status and the state of all workspaces. If you see <code>"velodb": "connected"</code>, the integration is successful.</p>
+
+<p><strong>Step 3: Start querying</strong></p>
+<blockquote>
+<p>list all available metrics</p>
+</blockquote>
+<p>The AI will automatically follow the three-step flow: <code>list_metrics</code> → <code>list_dimensions_for_metric</code> → <code>query_metric</code>.</p>
+
+<h3>1.2 Connect Cursor / VS Code</h3>
+<p>Create <code>.cursor/mcp.json</code> in the project root or use VS Code's MCP configuration:</p>
+<pre><code>{
+  "mcpServers": {
+    "velodb": {
+      "url": "http://&lt;MCP-Server-address&gt;:&lt;port&gt;/mcp",
+      "transport": "streamable-http",
+      "headers": {
+        "Authorization": "Bearer admin:admin"
+      }
+    }
+  }
+}</code></pre>
+
+<h3>1.3 Available tools at a glance (10 tools)</h3>
+
+<p><strong>🟢 Startup &amp; health check (call these first when starting a conversation)</strong></p>
+<table>
+<thead><tr><th>Tool</th><th>Parameters</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>get_query_guide</code></td>
+  <td>—</td>
+  <td><strong>Mandatory first call.</strong> Returns the full workflow guide: when to use the semantic layer vs raw SQL, tool call order, and query syntax. Without this tool the agent wastes time.</td>
+</tr>
+<tr>
+  <td><code>check_service_health</code></td>
+  <td>detail (optional)</td>
+  <td>Returns VeloDB connectivity + the state of each workspace (healthy / no_models / not_ready) and metric counts. Call it at the start of every conversation.</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>📊 Semantic queries (preferred; correct SQL generated automatically)</strong></p>
+<table>
+<thead><tr><th>Tool</th><th>Parameters</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>list_metrics</code></td>
+  <td>workspace (required), page_size, page_token</td>
+  <td>Lists all available metrics (name + description). The agent matches metrics against user intent.</td>
+</tr>
+<tr>
+  <td><code>list_dimensions_for_metric</code></td>
+  <td>workspace (required), metric_name (required)</td>
+  <td>Returns the metric's available group_by dimensions (name + type + description). Ensures group_by does not fail.</td>
+</tr>
+<tr>
+  <td><code>query_metric</code></td>
+  <td>workspace (required), metrics (required), group_by, where, order_by, limit, having, database, max_rows</td>
+  <td><strong>Core query tool.</strong> Compiles + executes semantic queries. Use it for anything involving counts/sums/ratios/rankings/trends. Supports HAVING to filter aggregated results. database specifies the target database; max_rows hard-caps returned rows (0 = default 10000).</td>
+</tr>
+<tr>
+  <td><code>reload_semantic_layer</code></td>
+  <td>workspace (required)</td>
+  <td>Manually triggers a semantic layer reload. Call it after an admin edits and commits YAML models if immediate effect is needed; otherwise auto-polling runs every 60s.</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>🔍 Low-level metadata &amp; raw SQL (use only in these two scenarios)</strong></p>
+
+<div class="card" style="background:#fff8e1; border-left:4px solid #d97706; margin-bottom:12px;">
+  <p><strong>⚠️ The two raw SQL scenarios:</strong></p>
+  <ul style="padding-left:20px; margin:6px 0;">
+    <li><strong>Scenario A — semantic layer unavailable:</strong> <code>check_service_health</code> shows no workspace in <code>healthy</code> state (all no_models / not_ready). All queries must then go through <code>list_databases</code> → <code>list_tables</code> → <code>describe_table</code> → <code>execute_query</code>.</li>
+    <li><strong>Scenario B — no matching metric:</strong> the semantic layer is healthy, but no metric in <code>list_metrics</code> matches the user's intent. Fall back to the raw SQL path in this case as well.</li>
+  </ul>
+</div>
+
+<table>
+<thead><tr><th>Tool</th><th>Parameters</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>list_databases</code></td>
+  <td>page_size, page_token</td>
+  <td>Lists all databases. Useful during exploration, but it cannot replace <code>list_metrics</code>.</td>
+</tr>
+<tr>
+  <td><code>list_tables</code></td>
+  <td>database (required), like, page_size, page_token</td>
+  <td>Lists table names in a database. <strong>Returns names only, no column info.</strong> Use <code>describe_table</code> for columns.</td>
+</tr>
+<tr>
+  <td><code>describe_table</code></td>
+  <td>database (required), table (required), detail_level</td>
+  <td>Shows the physical table structure (column names, types). detail_level: names/summary/full.</td>
+</tr>
+<tr>
+  <td><code>execute_query</code></td>
+  <td>sql (required), database, max_rows</td>
+  <td><strong>Raw SQL fallback.</strong> Read-only only (SELECT/SHOW/DESCRIBE/EXPLAIN). If the semantic layer has a matching metric, prefer <code>query_metric</code>.</td>
+</tr>
+</tbody>
+</table>
+
+<h3>1.4 Recommended agent workflow</h3>
+
+<div class="card" style="background:#f8fafc;">
+  <p><strong>🔁 Standard flow for every conversation:</strong></p>
+  <ol style="padding-left:20px; margin:12px 0;">
+    <li><code>get_query_guide()</code> — get the full guide (the agent learns which tool to use when)</li>
+    <li><code>check_service_health()</code> — confirm VeloDB connectivity and view available workspaces</li>
+    <li>
+      <strong>Routing decision:</strong>
+      <ul style="padding-left:16px; margin:4px 0;">
+        <li>"how many", "calculate", "trend", "ratio" questions → use the semantic layer, steps 4-5-6</li>
+        <li>"show table structure", "which databases" questions → use the metadata tools</li>
+        <li><strong>Semantic layer unavailable</strong> (no workspace healthy) → skip 4-6, go straight to 7</li>
+      </ul>
+    </li>
+    <li><code>list_metrics(workspace)</code> — list metrics and match the user's intent</li>
+    <li><code>list_dimensions_for_metric(workspace, metric_name)</code> — get the available dimensions</li>
+    <li><code>query_metric(workspace, metrics, group_by, ...)</code> — execute the query</li>
+    <li><strong>Fallback:</strong> if step 4 finds no matching metric, use <code>list_databases</code> → <code>list_tables</code> → <code>describe_table</code> → <code>execute_query</code> for the raw SQL path</li>
+  </ol>
+</div>
+
+<div class="card" style="background:#fef2f2; border-left:4px solid #dc2626;">
+  <p><strong>🚫 Hard rules:</strong></p>
+  <ul style="padding-left:20px; margin:6px 0;">
+    <li><strong>Semantic layer healthy + matching metric exists</strong> → never bypass <code>query_metric</code> and write SQL with <code>execute_query</code>.</li>
+    <li><strong>Semantic layer healthy + no matching metric</strong> → first tell the user "the semantic layer does not cover this query", then use <code>execute_query</code>, and include a warning in the result.</li>
+  </ul>
+</div>
+
+<h3>1.5 Conversation examples</h3>
+<pre><code>User: What is the total order amount by channel for the last month?
+
+AI thinking:
+  1. get_query_guide → get the guide ✓
+  2. check_service_health → workspace "example" healthy, 5 metrics ✓
+  3. involves "total amount", "channel" → use the semantic layer
+  4. list_metrics(example) → total_amount (total order amount) ✓
+  5. list_dimensions_for_metric(example, total_amount) → channel ✓
+  6. query_metric(example, metrics=[total_amount], group_by=[channel],
+                  where="order_date >= '2026-04-30'")
+
+AI reply:
+  channel  total_amount
+  WEB      1,096.00
+  APP      2,396.00
+  MINI       298.00</code></pre>
+<hr />
+<h2 id="server-cli-tools">2. CLI command-line tool</h2>
+<p><code>velodb-mcp-client</code> is the command-line client for the VeloDB MCP Server, used to call MCP tools and manage semantic models.</p>
+
+<h3>2.1 Configure the connection</h3>
+<p>The CLI gets connection info from environment variables or a config file (pick one):</p>
+<p><strong>Option 1: Environment variables</strong></p>
+<pre><code>export VELODB_MCP_SERVER=http://&lt;MCP-Server-address&gt;:&lt;port&gt;
+export VELODB_MCP_TOKEN=admin:admin</code></pre>
+<p><strong>Option 2: Config file <code>velodb-mcp-client.toml</code></strong></p>
+<pre><code>[server]
+VELODB_MCP_SERVER = "http://&lt;MCP-Server-address&gt;:&lt;port&gt;"
+VELODB_MCP_TOKEN = "admin:admin"</code></pre>
+<p>You can also specify a config file path with <code>-c</code>:</p>
+<pre><code>velodb-mcp-client -c /path/to/velodb-mcp-client.toml tool list</code></pre>
+
+<h3>2.2 Call MCP tools</h3>
+<pre><code># List all available tools
+velodb-mcp-client tool list
+
+# Show a tool's parameters
+velodb-mcp-client tool describe execute_query
+
+# Call a tool: simple arguments
+velodb-mcp-client tool call list_tables --arg database=analytics
+
+# Call a tool: JSON arguments
+velodb-mcp-client tool call query_metric --json \
+  '{"workspace":"example","metrics":["total_amount"],"group_by":["channel"]}'
+
+# Check the service health status
+velodb-mcp-client tool call check_service_health
+
+# Verbose mode (shows detailed errors)
+velodb-mcp-client -v tool call execute_query --arg sql="SELECT ..."</code></pre>
+
+<h3>2.3 Semantic model management</h3>
+<pre><code># List all semantic files in a workspace
+velodb-mcp-client semantic list --workspace example
+
+# View a file's content
+velodb-mcp-client semantic view orders.yaml --workspace example
+
+# Upload and push semantic models
+velodb-mcp-client semantic push ./models --workspace example
+
+# Query a push result (async)
+velodb-mcp-client semantic result &lt;request_id&gt;
+
+# Edit a semantic file (opens $EDITOR)
+velodb-mcp-client semantic edit orders.yaml --workspace example
+
+# Or pass the content directly
+velodb-mcp-client semantic edit orders.yaml --content "..." --workspace example
+
+# Stage a file for deletion
+velodb-mcp-client semantic delete old_model.yaml --workspace example
+
+# Trigger a semantic layer reload
+velodb-mcp-client semantic reload --workspace example
+
+# View the semantic layer status
+velodb-mcp-client semantic status
+
+# Pull the currently live semantic models locally
+velodb-mcp-client semantic pull --output ./remote-models --workspace example</code></pre>
+
+<h3>2.4 Quick command reference</h3>
+<table>
+<thead><tr><th>Command</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>velodb-mcp-client tool list</code></td><td>List all MCP tools</td></tr>
+<tr><td><code>velodb-mcp-client tool describe &lt;name&gt;</code></td><td>Show a tool's parameters</td></tr>
+<tr><td><code>velodb-mcp-client tool call &lt;name&gt; --arg k=v</code></td><td>Call a tool (key-value arguments)</td></tr>
+<tr><td><code>velodb-mcp-client tool call &lt;name&gt; --json '{...}'</code></td><td>Call a tool (JSON arguments)</td></tr>
+<tr><td><code>velodb-mcp-client semantic list -w &lt;ws&gt;</code></td><td>List semantic files</td></tr>
+<tr><td><code>velodb-mcp-client semantic push &lt;dir&gt; -w &lt;ws&gt;</code></td><td>Push semantic models</td></tr>
+<tr><td><code>velodb-mcp-client semantic result &lt;id&gt;</code></td><td>Query a push result</td></tr>
+<tr><td><code>velodb-mcp-client semantic edit &lt;file&gt; -w &lt;ws&gt;</code></td><td>Edit a semantic file</td></tr>
+<tr><td><code>velodb-mcp-client semantic pull -o &lt;dir&gt; -w &lt;ws&gt;</code></td><td>Pull semantic models</td></tr>
+<tr><td><code>velodb-mcp-client semantic status</code></td><td>Semantic layer status</td></tr>
+<tr><td><code>velodb-mcp-client semantic reload -w &lt;ws&gt;</code></td><td>Trigger a reload</td></tr>
+</tbody>
+</table>
+
+<hr />
+<h2 id="server-query-capabilities">3. Available query capabilities</h2>
+<p>Once connected, just ask questions in natural language in Claude Code; the AI automatically calls the corresponding MCP tool.</p>
+
+<h3>3.1 Metadata discovery</h3>
+<table>
+<thead><tr><th>What you want to do</th><th>Just say</th><th>Tool called</th></tr></thead>
+<tbody>
+<tr><td>See which databases exist</td><td>"list all databases"</td><td><code>list_databases</code></td></tr>
+<tr><td>See which tables are in a database</td><td>"list the tables in the dw database"</td><td><code>list_tables</code></td></tr>
+<tr><td>See a table's structure</td><td>"what fields does the orders table have"</td><td><code>describe_table</code></td></tr>
+</tbody>
+</table>
+
+<h3>3.2 SQL queries</h3>
+<table>
+<thead><tr><th>What you want to do</th><th>Just say</th><th>Tool called</th></tr></thead>
+<tbody>
+<tr><td>Query data</td><td>"query the top 10 orders"</td><td><code>execute_query</code></td></tr>
+<tr><td>Statistical analysis</td><td>"count orders by status"</td><td><code>execute_query</code></td></tr>
+</tbody>
+</table>
+<p><code>execute_query</code> only allows read-only SQL (SELECT / SHOW / DESCRIBE / EXPLAIN).</p>
+
+<h3>3.3 Semantic layer queries (requires the admin to have configured semantic models)</h3>
+<p>If your VeloDB cluster has a semantic layer configured, the agent completes a query in three steps:</p>
+<ol>
+  <li><code>list_metrics</code> — list all available metrics (name + description)</li>
+  <li><code>list_dimensions_for_metric</code> — view the metric's available dimensions (name + type + description)</li>
+  <li><code>query_metric</code> — execute the semantic query (supports HAVING to filter aggregated results)</li>
+</ol>
+<table>
+<thead><tr><th>What you want to do</th><th>Just say</th><th>Tool called</th></tr></thead>
+<tbody>
+<tr><td>See which metrics exist</td><td>"list all metrics"</td><td><code>list_metrics</code></td></tr>
+<tr><td>Query a revenue trend</td><td>"query revenue over the last 7 days, grouped by day"</td><td><code>query_metric</code></td></tr>
+<tr><td>See available dimensions</td><td>"which dimensions can total_amount be analyzed by"</td><td><code>list_dimensions_for_metric</code></td></tr>
+<tr><td>Check the service status</td><td>"check the service health status"</td><td><code>check_service_health</code></td></tr>
+</tbody>
+</table>
+<p>All semantic tools require the <code>workspace</code> parameter (the default <code>"example"</code> works).</p>
+
+<hr />
+<h2 id="server-query-examples">4. Query examples</h2>
+
+<h3>Example 1: Explore the data structure</h3>
+<pre><code>You: list all databases
+AI: [calls list_databases]
+    dw
+
+You: which tables are in the dw database
+AI: [calls list_tables]
+    orders, users, products, dim_date
+
+You: show me the structure of the orders table
+AI: [calls describe_table]
+    column       type      comment
+    order_id     BIGINT    Order ID
+    user_id      BIGINT    User ID
+    amount       DECIMAL   Amount
+    channel      VARCHAR   Channel
+    status       VARCHAR   Status
+    order_date   DATE      Order date</code></pre>
+
+<h3>Example 2: Data queries</h3>
+<pre><code>You: query the order count and total amount by status for the last week
+AI: [calls execute_query]
+    status      count   total_amount
+    completed   1234    567890.00
+    pending     567     89012.00
+    cancelled   89      12345.00</code></pre>
+
+<h3>Example 3: Semantic metrics</h3>
+<pre><code>You: list all available metrics
+AI: [calls list_metrics]
+    total_amount      Total order amount
+    order_count       Number of orders
+    avg_amount        Average order value
+    unique_users      Users who placed orders
+    user_count        Number of users
+
+You: query the total order amount by channel for the last 7 days
+AI: [calls list_dimensions_for_metric] → channel
+    [calls query_metric]
+    channel   total_amount
+    Online    12345.00
+    Offline   15678.00
+    ...</code></pre>
+
+<hr />
+<h2 id="server-faq">5. FAQ</h2>
+
+<h3>Q: Cannot connect, getting 401</h3>
+<p>Check the token format: <code>username:password</code> (separated by an English colon).</p>
+
+<h3>Q: Semantic query fails with "workspace not found"</h3>
+<p>Confirm the workspace name is correct; the default <code>"example"</code> works. Log into the WebUI to see available workspaces.</p>
+
+<h3>Q: Can I execute write operations?</h3>
+<p>No. <code>execute_query</code> only allows read-only SQL (SELECT / SHOW / DESCRIBE / EXPLAIN).</p>
+
+<h3>Q: Queries are slow?</h3>
+<p>With large data volumes, have the AI add <code>LIMIT</code> or narrow the time range.</p>
+
+<h3>Q: Which metrics can the semantic layer use?</h3>
+<p>Check quickly with the CLI:</p>
+<pre><code>velodb-mcp-client tool call list_metrics --json '{"workspace":"example"}'
+velodb-mcp-client tool call check_service_health</code></pre>
+</div>
+</section>
+
+<script>
+(function () {
+  const buttons = Array.from(document.querySelectorAll('.tab-button'));
+  const panels = Array.from(document.querySelectorAll('.doc-panel'));
+  const rightTocList = document.getElementById('right-toc-list');
+  function renderRightToc(panel) {
+    if (!rightTocList || !panel) return;
+    rightTocList.innerHTML = '';
+    Array.from(panel.querySelectorAll('h2[id]')).forEach((heading) => {
+      const item = document.createElement('li');
+      const link = document.createElement('a');
+      link.href = '#' + heading.id;
+      link.textContent = heading.textContent.trim();
+      item.appendChild(link);
+      rightTocList.appendChild(item);
+    });
+  }
+  function activate(key) {
+    let activePanel = null;
+    buttons.forEach((button) => {
+      const active = button.dataset.tab === key;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+    panels.forEach((panel) => {
+      const active = panel.id === 'panel-' + key;
+      panel.classList.toggle('active', active);
+      if (active) activePanel = panel;
+    });
+    renderRightToc(activePanel);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  buttons.forEach((button) => button.addEventListener('click', () => activate(button.dataset.tab)));
+  renderRightToc(document.querySelector('.doc-panel.active'));
+})();
+</script>
+</body>
+</html>
