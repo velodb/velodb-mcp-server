@@ -1,0 +1,28 @@
+semantic_model:
+  name: active_store_test
+  description: "Active file store; holds the final effective state of all files"
+  db_table: system_mcp.active_store_test
+  defaults:                       
+    agg_time_dimension: updated_at
+  
+  entities:
+    - name: filename
+      type: primary
+      expr: filename
+
+  dimensions:
+    - name: filename
+      type: categorical
+      expr: filename
+    
+    - name: updated_at
+      type: time
+      type_params:
+        time_granularity: day
+      expr: updated_at
+
+  measures:
+    - name: active_file_count
+      description: "Total number of files in the active store"
+      agg: count
+      expr: filename

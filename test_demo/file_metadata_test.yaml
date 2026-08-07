@@ -1,0 +1,52 @@
+semantic_model:
+  name: file_metadata_test
+  description: "File metadata table; records extended file information such as size, hash, and type"
+  db_table: system_mcp.file_metadata_test
+  defaults:
+    agg_time_dimension: last_modified
+  
+  entities:
+    - name: filename
+      type: primary
+      expr: filename
+
+  dimensions:
+    - name: filename
+      type: categorical
+      expr: filename
+    
+    - name: file_type
+      type: categorical
+      expr: file_type
+    
+    - name: last_modified
+      type: time
+      type_params:
+        time_granularity: day
+      expr: last_modified
+
+  measures:
+    - name: total_file_count
+      description: "Total number of files"
+      agg: count
+      expr: filename
+    
+    - name: total_file_size
+      description: "Total size of all files (bytes)"
+      agg: sum
+      expr: file_size
+    
+    - name: avg_file_size
+      description: "Average file size (bytes)"
+      agg: average
+      expr: file_size
+    
+    - name: max_file_size
+      description: "Maximum file size (bytes)"
+      agg: max
+      expr: file_size
+    
+    - name: min_file_size
+      description: "Minimum file size (bytes)"
+      agg: min
+      expr: file_size
