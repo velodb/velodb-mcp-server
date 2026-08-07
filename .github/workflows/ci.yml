@@ -1,0 +1,56 @@
+# =============================================================================
+# CI — basic verification for velodb-mcp-server
+#
+#   Triggers: push / pull_request to main
+#
+#   Jobs:
+#     test   — syntax check + offline unit tests (no VeloDB cluster needed)
+#     build  — compile check for linux-x64 + linux-arm64 (artifacts discarded;
+#              releases are produced separately by release.yml on tags)
+# =============================================================================
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install --quiet -r requirements.txt
+
+      - name: Syntax check
+        run: PYTHONPATH=src python -m compileall -q src mcp-client test
+
+      - name: Offline unit tests
+        run: PYTHONPATH=src bash test/run_all_tests.sh --offline
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux-x64, linux-arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cross-builds (linux-arm64) need a host Python with pip for wheel unpacking.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Build check (${{ matrix.platform }})
+        env:
+          VERSION: ci
+        run: ./build.sh ${{ matrix.platform }}
