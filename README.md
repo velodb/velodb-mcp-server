@@ -39,6 +39,18 @@ VeloDB MCP Server is a backend service that exposes [VeloDB](https://www.velodb.
 *   **Database**: any MySQL-protocol-compatible Doris-family cluster — VeloDB Cloud, VeloDB Enterprise, or Apache Doris — with the FE reachable (default `127.0.0.1:9030`)
 *   **Building from source**: curl/wget, or a local Python 3.10.x for offline builds
 
+## Supported Databases
+
+All Doris-family databases speak the same MySQL protocol, so this server works identically with all three:
+
+| Database | Deployment | How to connect |
+|----------|-----------|----------------|
+| **VeloDB Cloud** | Fully managed cloud service | Use your instance endpoint (e.g. `xxx.us-east-1.aws.velodb.io`) with port `9030` |
+| **VeloDB Enterprise** | Self-hosted / on-premise | Use any FE host (IP or hostname) with its MySQL port (default `9030`) |
+| **Apache Doris** | Open-source, self-hosted | Use any FE host (IP or hostname) with its MySQL port (default `9030`) |
+
+Just point `server.fe_host` / `server.fe_port` in `mcp-server.toml` at your cluster — no other configuration differs between them.
+
 ## 🤖 Install with an AI Agent (no docs reading required)
 
 If you use Claude Code (or another MCP-capable agent), you don't need to read
