@@ -1,13 +1,13 @@
 #!/bin/bash
 # =============================================================================
-# test/run_all_tests.sh — run all tests with one command
+# test/run_all_tests.sh — run all tests
 #
 # Usage:
-#   bash test/run_all_tests.sh              # Run all tests (requires MCP Server)
-#   bash test/run_all_tests.sh --offline    # Offline unit tests only (no MCP Server needed)
-#   bash test/run_all_tests.sh --tools      # Offline tests + Tool online tests only
-#   bash test/run_all_tests.sh --web        # Offline tests + Web/API online tests only
-#   bash test/run_all_tests.sh --smoke      # Offline tests + smoke test (fast)
+#   bash test/run_all_tests.sh              # run all tests (requires MCP Server)
+#   bash test/run_all_tests.sh --offline    # offline unit tests only (no MCP Server)
+#   bash test/run_all_tests.sh --tools      # offline tests + Tool online tests only
+#   bash test/run_all_tests.sh --web        # offline tests + Web/API online tests only
+#   bash test/run_all_tests.sh --smoke      # offline tests + smoke test only (fast)
 # =============================================================================
 set -euo pipefail
 
@@ -16,7 +16,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 MCP_URL="${MCP_URL:-http://localhost:3000/mcp}"
 MCP_BASE_URL="${MCP_BASE_URL:-http://localhost:3000}"
 
-# Prefer the project venv interpreter (offline tests depend on its third-party packages)
+# Prefer the project venv interpreter; offline tests depend on its packages.
 PYTHON_BIN="${PYTHON_BIN:-$PROJECT_DIR/.venv/bin/python}"
 if [ ! -x "$PYTHON_BIN" ]; then
     PYTHON_BIN="python3"
@@ -27,7 +27,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# ── Check whether the MCP Server is running ──────
+# ── Check whether MCP Server is running ────────────────────
 check_server() {
     if curl -s -o /dev/null -w "%{http_code}" "$MCP_BASE_URL/mcp/web/login" > /dev/null 2>&1; then
         echo -e "${GREEN}✅ MCP Server is running${NC}"
@@ -38,7 +38,7 @@ check_server() {
     fi
 }
 
-# ── Run Python tests ──────────────────────────────
+# ── Run Python tests ────────────────────────────
 run_python_test() {
     local test_file="$1"
     local label="$2"
@@ -47,15 +47,15 @@ run_python_test() {
     echo -e "${YELLOW}  $label${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     if "$PYTHON_BIN" "$test_file"; then
-        echo -e "${GREEN}✅ $label PASSED${NC}"
+        echo -e "${GREEN}✅ $label passed${NC}"
         return 0
     else
-        echo -e "${RED}❌ $label FAILED${NC}"
+        echo -e "${RED}❌ $label failed${NC}"
         return 1
     fi
 }
 
-# ── Smoke test (fast) ────────────────────────────────────
+# ── Smoke test (fast) ────────────────────────────
 smoke_test() {
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}  Smoke test${NC}"
@@ -118,24 +118,27 @@ smoke_test() {
     return 0
 }
 
-# ── Offline unit tests (no MCP Server required) ──
+# ── Offline unit tests (no MCP Server required) ─────────
 run_offline_unit_tests() {
-    run_python_test "$SCRIPT_DIR/test_sql_validator.py" "SQL read-only validation offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_sensitive_mask.py" "Sensitive data masking offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_pagination.py" "Pagination offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_private_ip_config.py" "Request node IP offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_deps.py" "Runtime dependency guard offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_cross_file_deps.py" "Cross-file dependency detection offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_semantic_grant.py" "Semantic table grant offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_credential_pass.py" "Credential pass-through offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_watcher.py" "Workspace watcher offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_manifest_dims.py" "Metric dimension extraction offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_compiler_where.py" "WHERE literal handling offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_web_session_cookie.py" "Web session cookie offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_session_affinity_proxy_routing.py" "Session-affinity proxy routing offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_session_affinity_proxy_streaming.py" "Session-affinity proxy streaming offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_session_affinity_proxy_relogin.py" "Session-affinity proxy re-login offline unit tests" || ((FAIL_COUNT += 1))
-    run_python_test "$SCRIPT_DIR/test_session_affinity_proxy_force_target.py" "Session-affinity proxy request address offline unit tests" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_sql_validator.py" "SQL read-only validation offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_sensitive_mask.py" "Sensitive data masking offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_pagination.py" "Pagination offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_private_ip_config.py" "Request node IP offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_deps.py" "Runtime dependency guard offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_cross_file_deps.py" "Cross-file dependency detection offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_semantic_grant.py" "Semantic table grant offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_credential_pass.py" "Credential pass-through offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_admin_role.py" "Doris admin-role authorization offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_watcher.py" "Workspace watcher offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_semantic_loading.py" "On-demand semantic loading offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_workspace_metadata.py" "Semantic workspace metadata offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_manifest_dims.py" "Metric dimension extraction offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_compiler_where.py" "WHERE literal handling offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_web_session_cookie.py" "Web session cookie offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_session_affinity_proxy_routing.py" "Session affinity proxy routing offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_session_affinity_proxy_streaming.py" "Session affinity proxy streaming offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_session_affinity_proxy_relogin.py" "Session affinity proxy relogin offline unit test" || ((FAIL_COUNT += 1))
+    run_python_test "$SCRIPT_DIR/test_session_affinity_proxy_force_target.py" "Session affinity proxy request target offline unit test" || ((FAIL_COUNT += 1))
 }
 
 # ── Main ─────────────────────────────────────────
@@ -146,7 +149,7 @@ MODE="${1:-}"
 run_offline_unit_tests
 
 if [ "$MODE" = "--offline" ]; then
-    : # Offline mode: no server check, no online stages
+    : # Offline mode: do not check the server or run online stages.
 else
     check_server
 fi
@@ -155,24 +158,24 @@ case "$MODE" in
     --offline)
         ;;
     --tools)
-        run_python_test "$SCRIPT_DIR/test_mcp_tools.py" "MCP Tools tests" || ((FAIL_COUNT += 1))
+        run_python_test "$SCRIPT_DIR/test_mcp_tools.py" "MCP Tools test" || ((FAIL_COUNT += 1))
         ;;
     --web)
-        run_python_test "$SCRIPT_DIR/test_web_api.py" "Web UI & API tests" || ((FAIL_COUNT += 1))
+        run_python_test "$SCRIPT_DIR/test_web_api.py" "Web UI & API test" || ((FAIL_COUNT += 1))
         ;;
     --smoke)
         smoke_test || ((FAIL_COUNT += 1))
         ;;
     "")
-        # Run everything
+        # Run everything.
         smoke_test || ((FAIL_COUNT += 1))
-        run_python_test "$SCRIPT_DIR/test_mcp_tools.py" "MCP Tools tests" || ((FAIL_COUNT += 1))
-        run_python_test "$SCRIPT_DIR/test_web_api.py" "Web UI & API tests" || ((FAIL_COUNT += 1))
+        run_python_test "$SCRIPT_DIR/test_mcp_tools.py" "MCP Tools test" || ((FAIL_COUNT += 1))
+        run_python_test "$SCRIPT_DIR/test_web_api.py" "Web UI & API test" || ((FAIL_COUNT += 1))
         ;;
     *)
         echo "Usage: $0 [--offline|--tools|--web|--smoke]"
         echo "  (no args)  Run all tests (requires MCP Server)"
-        echo "  --offline  Offline unit tests only (no MCP Server needed)"
+        echo "  --offline  Offline unit tests only (no MCP Server)"
         echo "  --tools    MCP Tool tests only"
         echo "  --web      Web UI & API tests only"
         echo "  --smoke    Smoke test only (fast)"

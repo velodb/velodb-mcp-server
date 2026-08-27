@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "velodb": {
+    "doris": {
       "type": "http",
       "url": "http://<host>:3000/mcp",
       "headers": {
-        "Authorization": "Bearer <velodb-user>:<velodb-password>"
+        "Authorization": "Bearer <doris-user>:<doris-password>"
       }
     }
   }

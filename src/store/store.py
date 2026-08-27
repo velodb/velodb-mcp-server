@@ -1,6 +1,6 @@
-"""Semantic configuration store backed by VeloDB.
+"""Semantic configuration store backed by Doris.
 
-Multi-workspace: each workspace has its own pair of VeloDB tables:
+Multi-workspace: each workspace has its own pair of Doris tables:
 
   system_mcp.active_store_{workspace}   — active (production) models
   system_mcp.staging_store_{workspace}  — pending changes
@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pymysql
 
-logger = logging.getLogger("velodb_mcp_server.store")
+logger = logging.getLogger("doris_new_mcp.store")
 
 # ---------------------------------------------------------------------------
 # StoreState
@@ -44,25 +44,37 @@ class StoreState:
     revision: str
     version_label: str | None = None
     updated_at: str | None = None
+    semantic_enabled: bool = True
+    semantic_version: int = 0
+
+
+@dataclass(frozen=True)
+class WorkspaceMetadata:
+    workspace: str
+    semantic_enabled: bool
+    semantic_version: int
+    updated_at: str | None = None
+    updated_by: str | None = None
 
 
 # ---------------------------------------------------------------------------
-# VeloDBStore
+# DorisStore
 # ---------------------------------------------------------------------------
 
-_VELODB_HOST = "127.0.0.1"
-_VELODB_PORT = 9030
-_VELODB_DB = "system_mcp"
+_DORIS_HOST = "127.0.0.1"
+_DORIS_PORT = 9030
+_DORIS_DB = "system_mcp"
+_WORKSPACE_METADATA_TABLE = "workspace_metadata"
 
 # Request-scoped credential override. Set once at the start of each
 # authenticated request, read by _get_conn(). Destroyed when the
 # asyncio Task ends — no cross-request leakage.
 _request_creds: contextvars.ContextVar[tuple[str, str] | None] = \
-    contextvars.ContextVar('_velodb_store_creds', default=None)
+    contextvars.ContextVar('_doris_store_creds', default=None)
 
 
 def set_request_credentials(user: str, password: str) -> None:
-    """Inject VeloDB credentials for the current request.
+    """Inject Doris credentials for the current request.
 
     Called once at request entry (CredentialVerifier or HTTP auth).
     The credentials live only for the duration of this asyncio Task.
@@ -70,36 +82,36 @@ def set_request_credentials(user: str, password: str) -> None:
     _request_creds.set((user, password))
 
 
-def set_velodb_endpoint(host: str, port: int) -> None:
-    """Update the VeloDB FE endpoint from server configuration."""
-    global _VELODB_HOST, _VELODB_PORT
-    _VELODB_HOST = host
-    _VELODB_PORT = port
+def set_doris_endpoint(host: str, port: int) -> None:
+    """Update the Doris FE endpoint from server configuration."""
+    global _DORIS_HOST, _DORIS_PORT
+    _DORIS_HOST = host
+    _DORIS_PORT = port
 
 
-def set_velodb_port(port: int) -> None:
-    """Update only the VeloDB FE port while preserving the configured host."""
-    global _VELODB_PORT
-    _VELODB_PORT = port
+def set_doris_port(port: int) -> None:
+    """Update only the Doris FE port while preserving the configured host."""
+    global _DORIS_PORT
+    _DORIS_PORT = port
 
 
 def _get_conn() -> pymysql.Connection:
     creds = _request_creds.get()
     if creds is None:
         raise RuntimeError(
-            "No VeloDB credentials in request context. "
+            "No Doris credentials in request context. "
             "Ensure the request carries a valid Bearer token or session cookie."
         )
     user, password = creds
     return pymysql.connect(
-        host=_VELODB_HOST, port=_VELODB_PORT,
+        host=_DORIS_HOST, port=_DORIS_PORT,
         user=user, password=password,
         charset="utf8mb4", autocommit=True,
         connect_timeout=5,
     )
 
 
-class VeloDBStore:
+class DorisStore:
     """Semantic model storage for a single workspace.
 
     Each workspace has its own pair of tables:
@@ -123,11 +135,11 @@ class VeloDBStore:
 
     @property
     def store_type(self) -> str:
-        return "velodb"
+        return "doris"
 
     @property
     def source_uri(self) -> str:
-        return f"velodb://{_VELODB_HOST}:{_VELODB_PORT}/{_VELODB_DB}/{self._active_table}"
+        return f"doris://{_DORIS_HOST}:{_DORIS_PORT}/{_DORIS_DB}/{self._active_table}"
 
     @property
     def active_table(self) -> str:
@@ -147,8 +159,8 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"CREATE DATABASE IF NOT EXISTS {_VELODB_DB}")
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"CREATE DATABASE IF NOT EXISTS {_DORIS_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 cur.execute("SHOW TABLES LIKE 'active_store_%'")
                 tables = [r[0] for r in cur.fetchall()]
         finally:
@@ -167,7 +179,16 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
+                try:
+                    cur.execute(
+                        f"DELETE FROM {_WORKSPACE_METADATA_TABLE} WHERE workspace = %s",
+                        (workspace,),
+                    )
+                except Exception:
+                    # Backward-compatible with deployments created before the
+                    # shared metadata table existed.
+                    pass
                 cur.execute(f"DROP TABLE IF EXISTS active_store_{workspace}")
                 cur.execute(f"DROP TABLE IF EXISTS staging_store_{workspace}")
             logger.info(f"Dropped semantic tables for workspace '{workspace}'")
@@ -179,23 +200,100 @@ class VeloDBStore:
     # ------------------------------------------------------------------
 
     def check_remote(self) -> StoreState:
+        metadata = self.get_workspace_metadata()
+        return StoreState(
+            revision=str(metadata.semantic_version),
+            updated_at=metadata.updated_at,
+            semantic_enabled=metadata.semantic_enabled,
+            semantic_version=metadata.semantic_version,
+        )
+
+    # ------------------------------------------------------------------
+    # Workspace metadata
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _metadata_from_row(workspace: str, row: tuple) -> WorkspaceMetadata:
+        updated_at = row[2]
+        if isinstance(updated_at, datetime):
+            updated_at = updated_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+        elif updated_at is not None:
+            updated_at = str(updated_at)
+        return WorkspaceMetadata(
+            workspace=workspace,
+            semantic_enabled=bool(row[0]),
+            semantic_version=int(row[1]),
+            updated_at=updated_at,
+            updated_by=str(row[3]) if row[3] is not None else None,
+        )
+
+    def _get_workspace_metadata_with_cursor(self, cur) -> WorkspaceMetadata:
+        cur.execute(
+            f"SELECT semantic_enabled, semantic_version, updated_at, updated_by "
+            f"FROM {_WORKSPACE_METADATA_TABLE} WHERE workspace = %s",
+            (self._workspace,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            user = (_request_creds.get() or ("system", ""))[0]
+            now = datetime.now()
+            cur.execute(
+                f"INSERT INTO {_WORKSPACE_METADATA_TABLE} "
+                "(workspace, semantic_enabled, semantic_version, updated_at, updated_by) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (self._workspace, True, 1, now, user),
+            )
+            return WorkspaceMetadata(
+                workspace=self._workspace,
+                semantic_enabled=True,
+                semantic_version=1,
+                updated_at=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                updated_by=user,
+            )
+        return self._metadata_from_row(self._workspace, row)
+
+    def get_workspace_metadata(self) -> WorkspaceMetadata:
         self._ensure_tables()
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
-                try:
-                    cur.execute(f"SHOW TABLETS FROM {self._active_table}")
-                    rows = cur.fetchall()
-                    if rows and cur.description:
-                        cols = [d[0] for d in cur.description]
-                        if "Version" in cols:
-                            vi = cols.index("Version")
-                            max_ver = max(int(r[vi]) for r in rows)
-                            return StoreState(revision=str(max_ver))
-                except Exception:
-                    pass
-                return StoreState(revision="")
+                cur.execute(f"USE {_DORIS_DB}")
+                return self._get_workspace_metadata_with_cursor(cur)
+        finally:
+            conn.close()
+
+    def set_semantic_enabled(self, enabled: bool, updated_by: str) -> WorkspaceMetadata:
+        self._ensure_tables()
+        conn = _get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f"USE {_DORIS_DB}")
+                self._get_workspace_metadata_with_cursor(cur)
+                cur.execute(
+                    f"UPDATE {_WORKSPACE_METADATA_TABLE} "
+                    "SET semantic_enabled = %s, updated_at = %s, updated_by = %s "
+                    "WHERE workspace = %s",
+                    (enabled, datetime.now(), updated_by, self._workspace),
+                )
+                return self._get_workspace_metadata_with_cursor(cur)
+        finally:
+            conn.close()
+
+    def bump_semantic_version(self, updated_by: str | None = None) -> WorkspaceMetadata:
+        self._ensure_tables()
+        conn = _get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f"USE {_DORIS_DB}")
+                self._get_workspace_metadata_with_cursor(cur)
+                user = updated_by or (_request_creds.get() or ("system", ""))[0]
+                cur.execute(
+                    f"UPDATE {_WORKSPACE_METADATA_TABLE} "
+                    "SET semantic_version = semantic_version + 1, "
+                    "updated_at = %s, updated_by = %s WHERE workspace = %s",
+                    (datetime.now(), user, self._workspace),
+                )
+                return self._get_workspace_metadata_with_cursor(cur)
         finally:
             conn.close()
 
@@ -210,14 +308,20 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 cur.execute(f"SELECT filename, updated_at, content FROM {self._active_table}")
                 rows = cur.fetchall()
         finally:
             conn.close()
 
         if not rows:
-            return StoreState(revision="", updated_at=None)
+            metadata = self.get_workspace_metadata()
+            return StoreState(
+                revision=str(metadata.semantic_version),
+                updated_at=metadata.updated_at,
+                semantic_enabled=metadata.semantic_enabled,
+                semantic_version=metadata.semantic_version,
+            )
 
         db_filenames: set[str] = set()
         latest_updated: datetime | None = None
@@ -240,12 +344,15 @@ class VeloDBStore:
                 if rel not in db_filenames:
                     os.remove(full)
 
-        revision = hashlib.sha256(
-            json.dumps(sorted(db_filenames), ensure_ascii=False).encode()
-        ).hexdigest()
+        metadata = self.get_workspace_metadata()
         updated_at = latest_updated.strftime("%Y-%m-%dT%H:%M:%SZ") if latest_updated else None
         logger.info(f"fetch [{self._workspace}]: {len(rows)} files → {local_dir}")
-        return StoreState(revision=revision, updated_at=updated_at)
+        return StoreState(
+            revision=str(metadata.semantic_version),
+            updated_at=updated_at,
+            semantic_enabled=metadata.semantic_enabled,
+            semantic_version=metadata.semantic_version,
+        )
 
     # ------------------------------------------------------------------
     # Active file helpers
@@ -256,7 +363,7 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 cur.execute(
                     f"SELECT filename, updated_at, LENGTH(content) AS size_bytes "
                     f"FROM {self._active_table} ORDER BY filename"
@@ -277,7 +384,7 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 cur.execute(f"SELECT filename, updated_at, content FROM {self._active_table} WHERE filename = %s", (filename,))
                 row = cur.fetchone()
         finally:
@@ -299,7 +406,7 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 cur.execute(
                     f"SELECT filename, action, updated_at, LENGTH(content) AS size_bytes "
                     f"FROM {self._staging_table} ORDER BY filename"
@@ -321,7 +428,7 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 cur.execute(f"SELECT 1 FROM {self._staging_table} WHERE filename = %s", (filename,))
                 if cur.fetchone():
                     cur.execute(
@@ -349,7 +456,7 @@ class VeloDBStore:
         result = "not_found"
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 # Check staging first
                 cur.execute(f"SELECT 1 FROM {self._staging_table} WHERE filename = %s", (filename,))
                 if cur.fetchone():
@@ -375,7 +482,7 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 cur.execute(f"DELETE FROM {self._staging_table}")
         finally:
             conn.close()
@@ -388,7 +495,7 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 cur.execute(f"SELECT filename, content FROM {self._active_table}")
                 active = {r[0]: r[1] for r in cur.fetchall()}
                 cur.execute(f"SELECT filename, action, content FROM {self._staging_table}")
@@ -425,15 +532,18 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
                 cur.execute(f"SELECT filename, action, content, updated_at FROM {self._staging_table}")
                 stg_rows = cur.fetchall()
 
                 if not stg_rows:
-                    cur.execute(f"SELECT MAX(updated_at), COUNT(*) FROM {self._active_table}")
-                    row = cur.fetchone()
-                    revision = hashlib.sha256(f"{row[0]}_{row[1]}".encode()).hexdigest() if row and row[0] else ""
-                    return StoreState(revision=revision)
+                    metadata = self._get_workspace_metadata_with_cursor(cur)
+                    return StoreState(
+                        revision=str(metadata.semantic_version),
+                        updated_at=metadata.updated_at,
+                        semantic_enabled=metadata.semantic_enabled,
+                        semantic_version=metadata.semantic_version,
+                    )
 
                 for fn, action, content, stg_ts in stg_rows:
                     if action == "delete":
@@ -453,19 +563,25 @@ class VeloDBStore:
 
                 cur.execute(f"DELETE FROM {self._staging_table}")
 
-                cur.execute(f"SELECT MAX(updated_at), COUNT(*) FROM {self._active_table}")
-                row = cur.fetchone()
-                if row and row[0] is not None:
-                    max_ts, cnt = row
-                    revision = hashlib.sha256(f"{max_ts}_{cnt}".encode()).hexdigest()
-                    updated_at = max_ts.strftime("%Y-%m-%dT%H:%M:%SZ") if isinstance(max_ts, datetime) else str(max_ts)
-                else:
-                    revision, updated_at = "", None
+                self._get_workspace_metadata_with_cursor(cur)
+                user = (_request_creds.get() or ("system", ""))[0]
+                cur.execute(
+                    f"UPDATE {_WORKSPACE_METADATA_TABLE} "
+                    "SET semantic_version = semantic_version + 1, "
+                    "updated_at = %s, updated_by = %s WHERE workspace = %s",
+                    (datetime.now(), user, self._workspace),
+                )
+                metadata = self._get_workspace_metadata_with_cursor(cur)
         finally:
             conn.close()
 
         logger.info(f"staging committed [{self._workspace}]: {len(stg_rows)} changes, staging cleared")
-        return StoreState(revision=revision, updated_at=updated_at)
+        return StoreState(
+            revision=str(metadata.semantic_version),
+            updated_at=metadata.updated_at,
+            semantic_enabled=metadata.semantic_enabled,
+            semantic_version=metadata.semantic_version,
+        )
 
     # ------------------------------------------------------------------
     # Internal
@@ -480,8 +596,19 @@ class VeloDBStore:
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(f"CREATE DATABASE IF NOT EXISTS {_VELODB_DB}")
-                cur.execute(f"USE {_VELODB_DB}")
+                cur.execute(f"CREATE DATABASE IF NOT EXISTS {_DORIS_DB}")
+                cur.execute(f"USE {_DORIS_DB}")
+                cur.execute(f"""\
+                    CREATE TABLE IF NOT EXISTS {_WORKSPACE_METADATA_TABLE} (
+                        workspace          VARCHAR(128) NOT NULL,
+                        semantic_enabled   TINYINT NOT NULL DEFAULT "1",
+                        semantic_version   BIGINT NOT NULL DEFAULT "1",
+                        updated_at         DATETIME NOT NULL,
+                        updated_by         VARCHAR(256) NULL
+                    ) UNIQUE KEY(workspace)
+                    DISTRIBUTED BY HASH(workspace) BUCKETS 1
+                    PROPERTIES ('replication_num' = '1')
+                """)
                 cur.execute(f"""\
                     CREATE TABLE IF NOT EXISTS {self._active_table} (
                         filename    VARCHAR(512) NOT NULL,
@@ -501,6 +628,7 @@ class VeloDBStore:
                     DISTRIBUTED BY HASH(filename) BUCKETS 1
                     PROPERTIES ('replication_num' = '1')
                 """)
+                self._get_workspace_metadata_with_cursor(cur)
             self._table_cache[key] = True
             logger.info(f"Tables ensured for workspace '{self._workspace}': {self._active_table}, {self._staging_table}")
         except Exception as e:

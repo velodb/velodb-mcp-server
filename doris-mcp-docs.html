@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doris MCP Documentation</title>
+  <style>
+:root {
+  --bg: #fff;
+  --surface: #f8f9fa;
+  --border: #dee2e6;
+  --text: #212529;
+  --muted: #6c757d;
+  --accent: #0d6efd;
+  --code-bg: #f4f4f4;
+  --table-stripe: #f2f6fc;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+  font-size: 15px;
+  padding-top: 64px;
+}
+.top-tabs {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 20;
+  background: rgba(255,255,255,.96);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+.tab-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  gap: .35rem;
+  padding: .75rem 2rem;
+  overflow-x: auto;
+}
+.tab-button {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: .5rem .85rem;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab-button:hover { color: var(--accent); background: var(--surface); }
+.tab-button.active { color: var(--accent); background: rgb(231,241,255); border-color: rgb(190,215,255); }
+.doc-panel { display: none; }
+.doc-panel.active { display: block; }
+header {
+  background: linear-gradient(rgb(240,245,255) 0%, rgb(255,255,255) 100%);
+  border-bottom: 3px solid var(--accent);
+  padding: 2.5rem 2rem 2rem;
+}
+header h1, header p, .container { max-width: 980px; margin-left: auto; margin-right: auto; }
+header h1 { font-size: 1.8rem; color: var(--accent); font-weight: 700; }
+header p { margin-top: .5rem; color: var(--muted); }
+.container { padding: 2rem 2.5rem 4rem; }
+.toc, .card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 0 0 1.25rem;
+}
+.toc h3 { font-size: .95rem; color: var(--muted); margin-bottom: .5rem; }
+.toc ol { padding-left: 1.2rem; line-height: 1.9; }
+h2 {
+  font-size: 1.35rem;
+  color: var(--accent);
+  margin: 2.5rem 0 .8rem;
+  padding-bottom: .35rem;
+  border-bottom: 2px solid var(--border);
+}
+h3 { font-size: 1.08rem; margin: 1.4rem 0 .5rem; }
+p { margin: .5rem 0; max-width: 86ch; }
+ul, ol { padding-left: 1.6rem; margin: .7rem 0; }
+li { margin: .25rem 0; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+  background: var(--code-bg);
+  padding: .12em .4em;
+  border-radius: 4px;
+  font-family: "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-size: .88em;
+}
+pre {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: .8rem 0;
+  overflow-x: auto;
+  font-size: .84rem;
+  line-height: 1.6;
+}
+pre code { background: none; padding: 0; white-space: pre; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: .8rem 0;
+  font-size: .88rem;
+  display: block;
+  overflow-x: auto;
+}
+th, td { border: 1px solid var(--border); padding: .5rem .75rem; text-align: left; vertical-align: top; }
+th { background: var(--surface); font-weight: 600; }
+tr:nth-child(2n) { background: var(--table-stripe); }
+.callout {
+  border-left: 4px solid var(--accent);
+  background: rgb(231,241,255);
+  padding: .75rem 1rem;
+  margin: .9rem 0;
+  border-radius: 0 6px 6px 0;
+}
+footer {
+  text-align: center;
+  color: var(--muted);
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: .82rem;
+}
+@media (max-width: 700px) {
+  body { font-size: 14px; padding-top: 58px; }
+  .tab-inner { padding: .65rem 1rem; }
+  header { padding: 2rem 1rem 1.5rem; }
+  header h1 { font-size: 1.5rem; }
+  .container { padding: 1.25rem 1rem 3rem; }
+}
+  </style>
+</head>
+<body>
+<nav class="top-tabs" role="tablist" aria-label="Doris MCP documentation">
+  <div class="tab-inner">
+    <button id="tab-semantic" class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="panel-semantic" data-tab="semantic">Semantic Models</button>
+    <button id="tab-server" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-server" data-tab="server">User Guide</button>
+  </div>
+</nav>
+
+<section id="panel-semantic" class="doc-panel active" role="tabpanel" aria-labelledby="tab-semantic">
+<header>
+  <h1>Doris MCP Semantic Models</h1>
+  <p>MetricFlow v0.209.0 reference for defining governed Doris metrics in YAML.</p>
+</header>
+<div class="container">
+  <div class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#intro">What a semantic model is</a></li>
+      <li><a href="#quickstart">Quick start</a></li>
+      <li><a href="#model">Model structure</a></li>
+      <li><a href="#entities">Entities</a></li>
+      <li><a href="#dimensions">Dimensions</a></li>
+      <li><a href="#measures">Measures</a></li>
+      <li><a href="#advanced-metrics">Advanced metrics</a></li>
+      <li><a href="#patterns">Common patterns</a></li>
+      <li><a href="#errors">Troubleshooting</a></li>
+      <li><a href="#management">Managing models</a></li>
+    </ol>
+  </div>
+
+  <h2 id="intro">1. What a Semantic Model Is</h2>
+  <div class="card">
+    <p>A semantic model is a business description of a database table. It tells the system which column uniquely identifies a row, which fields can be used for grouping and filtering, and which fields should be aggregated as measures.</p>
+    <p>After models are committed, agents can answer business questions with <code>list_metrics</code>, <code>list_dimensions_for_metric</code>, and <code>query_metric</code> instead of writing fragile aggregation SQL by hand.</p>
+  </div>
+
+  <h2 id="quickstart">2. Quick Start</h2>
+  <h3>Step 1: Create a model YAML file</h3>
+<pre><code># models/orders.yaml
+---
+semantic_model:
+  name: orders
+  db_table: dw.orders
+  defaults:
+    agg_time_dimension: order_date
+
+  entities:
+    - name: order
+      type: primary
+      expr: order_id
+    - name: user
+      type: foreign
+      expr: user_id
+
+  dimensions:
+    - name: order_date
+      type: time
+      type_params:
+        time_granularity: day
+      expr: order_date
+    - name: channel
+      type: categorical
+      expr: channel
+    - name: status
+      type: categorical
+      expr: status
+
+  measures:
+    - name: total_amount
+      agg: sum
+      expr: amount
+      description: Total order amount
+    - name: order_count
+      agg: count_distinct
+      expr: order_id
+      description: Order count
+</code></pre>
+
+  <h3>Step 2: Add the project time configuration</h3>
+<pre><code># models/project.yaml
+---
+time_config:
+  calendar:
+    - table: dw.dim_date
+      column: date_id
+      grain: day
+</code></pre>
+
+  <h3>Step 3: Validate and commit</h3>
+  <ol>
+    <li>Open the Web UI and stage the YAML files, or push them with the CLI.</li>
+    <li>Run <strong>Validate</strong> to check YAML syntax, file structure, table existence, column names, entity definitions, and duplicate names.</li>
+    <li>Run <strong>Commit</strong> to publish the validated staged version.</li>
+    <li>Use <code>list_metrics</code> to discover metrics and <code>query_metric</code> to query them.</li>
+  </ol>
+
+  <h2 id="model">3. Model Structure</h2>
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Globally unique model name. Use lowercase letters, digits, and underscores.</td></tr>
+    <tr><td><code>db_table</code></td><td>string</td><td>Yes</td><td>Physical Doris table in <code>database.table</code> form, for example <code>dw.orders</code>.</td></tr>
+    <tr><td><code>defaults</code></td><td>object</td><td>Yes</td><td>Default settings. Currently must include <code>agg_time_dimension</code>.</td></tr>
+    <tr><td><code>entities</code></td><td>list</td><td>Yes</td><td>Entity definitions. At least one primary entity is required.</td></tr>
+    <tr><td><code>dimensions</code></td><td>list</td><td>Yes</td><td>Fields available for grouping and filtering.</td></tr>
+    <tr><td><code>measures</code></td><td>list</td><td>Recommended</td><td>Aggregation definitions. Measures create queryable metrics by default.</td></tr>
+    <tr><td><code>description</code></td><td>string</td><td>No</td><td>Human-readable model description.</td></tr>
+    <tr><td><code>label</code></td><td>string</td><td>No</td><td>Display label.</td></tr>
+    <tr><td><code>primary_entity</code></td><td>string</td><td>Conditional</td><td>Required when no entity has <code>type: primary</code>.</td></tr>
+  </table>
+  <div class="callout">
+    Names must start with a lowercase letter, contain only lowercase letters, digits, and underscores, avoid consecutive underscores, and contain at least two characters.
+  </div>
+
+  <h2 id="entities">4. Entities</h2>
+  <p>Entities describe uniqueness and relationships between tables.</p>
+  <table>
+    <tr><th>Type</th><th>Meaning</th><th>Typical Use</th></tr>
+    <tr><td><code>primary</code></td><td>Unique for each row and covers the whole table.</td><td>ID column for the table. Each model should have exactly one primary entity.</td></tr>
+    <tr><td><code>foreign</code></td><td>Reference to another model. Values may repeat or be null.</td><td><code>user_id</code>, <code>product_id</code>, <code>customer_id</code>.</td></tr>
+    <tr><td><code>unique</code></td><td>Unique identifier that may not cover every row.</td><td>Email address, external reference number.</td></tr>
+    <tr><td><code>natural</code></td><td>Real-world unique identifier.</td><td>SKU, barcode, employee number.</td></tr>
+  </table>
+<pre><code>entities:
+  - name: order
+    type: primary
+    expr: order_id
+  - name: user
+    type: foreign
+    expr: user_id
+</code></pre>
+
+  <h2 id="dimensions">5. Dimensions</h2>
+  <p>Dimensions define how data can be grouped and filtered. Use <code>time</code> for date/time fields and <code>categorical</code> for discrete buckets.</p>
+  <table>
+    <tr><th>Field</th><th>Description</th></tr>
+    <tr><td><code>name</code></td><td>Dimension name.</td></tr>
+    <tr><td><code>type</code></td><td><code>time</code> or <code>categorical</code>.</td></tr>
+    <tr><td><code>type_params.time_granularity</code></td><td>Required for time dimensions. Supported grains include <code>day</code>, <code>week</code>, <code>month</code>, <code>quarter</code>, <code>year</code>, <code>hour</code>, and <code>minute</code>.</td></tr>
+    <tr><td><code>expr</code></td><td>Column name or SQL expression. Defaults to <code>name</code> when omitted.</td></tr>
+    <tr><td><code>is_partition</code></td><td>Marks a partition column. Default is <code>false</code>.</td></tr>
+  </table>
+
+  <h2 id="measures">6. Measures</h2>
+  <p>Measures define aggregations. Each measure creates a same-named metric unless <code>create_metric: false</code> is set.</p>
+  <table>
+    <tr><th>Aggregation</th><th>Meaning</th><th>Examples</th></tr>
+    <tr><td><code>sum</code></td><td>Sum values.</td><td>Total amount, total quantity.</td></tr>
+    <tr><td><code>count</code></td><td>Count rows or non-null values.</td><td>Event count.</td></tr>
+    <tr><td><code>count_distinct</code></td><td>Count unique values.</td><td>Unique users, unique devices.</td></tr>
+    <tr><td><code>average</code></td><td>Average value.</td><td>Average order value, average duration.</td></tr>
+    <tr><td><code>min</code></td><td>Minimum value.</td><td>Lowest price, earliest timestamp.</td></tr>
+    <tr><td><code>max</code></td><td>Maximum value.</td><td>Highest price, latest timestamp.</td></tr>
+    <tr><td><code>median</code></td><td>Median value.</td><td>Median order amount.</td></tr>
+    <tr><td><code>percentile</code></td><td>Percentile value.</td><td>P95 amount, P99 latency.</td></tr>
+    <tr><td><code>sum_boolean</code></td><td>Sum boolean values.</td><td>Conversion count, qualified count.</td></tr>
+  </table>
+
+  <h2 id="advanced-metrics">7. Advanced Metrics</h2>
+  <p>Advanced metrics are defined with top-level <code>metric:</code> YAML documents. They combine existing measures or metrics.</p>
+  <table>
+    <tr><th>Type</th><th>Purpose</th><th>Typical Use</th></tr>
+    <tr><td><code>ratio</code></td><td>Numerator divided by denominator.</td><td>Conversion rate, margin, share.</td></tr>
+    <tr><td><code>derived</code></td><td>Expression over one or more existing metrics.</td><td>Month-over-month growth, weighted calculations.</td></tr>
+    <tr><td><code>cumulative</code></td><td>Accumulates a metric over a time window.</td><td>Last 7 days sales, month-to-date registrations.</td></tr>
+    <tr><td><code>conversion</code></td><td>Analyzes conversion between two events.</td><td>Visit-to-order or signup-to-purchase conversion.</td></tr>
+  </table>
+<pre><code># models/order_conversion_rate.yaml
+---
+metric:
+  name: order_conversion_rate
+  type: ratio
+  description: Order conversion rate
+  type_params:
+    numerator: order_count
+    denominator: visit_count
+</code></pre>
+
+  <h2 id="patterns">8. Common Patterns</h2>
+  <table>
+    <tr><th>Goal</th><th>Pattern</th></tr>
+    <tr><td>Hide helper measures</td><td>Set <code>create_metric: false</code>.</td></tr>
+    <tr><td>Group by month</td><td>Use a time dimension with <code>time_granularity: month</code>, or pass the supported grain through <code>query_metric</code>.</td></tr>
+    <tr><td>Join dimensions across tables</td><td>Declare primary and foreign entities consistently, then use <code>list_dimensions_for_metric</code> to discover valid joins.</td></tr>
+    <tr><td>Filter aggregated results</td><td>Use <code>having</code> in <code>query_metric</code>, for example <code>total_amount &gt; 1000</code>.</td></tr>
+  </table>
+
+  <h2 id="errors">9. Troubleshooting</h2>
+  <table>
+    <tr><th>Error</th><th>Likely Cause</th><th>Fix</th></tr>
+    <tr><td><code>Staging must be validated before commit</code></td><td>Commit was called before successful validation.</td><td>Run Validate and fix reported errors before committing.</td></tr>
+    <tr><td>Table not found</td><td><code>db_table</code> points to a missing Doris table.</td><td>Check database/table names and permissions.</td></tr>
+    <tr><td>Column not found</td><td><code>expr</code> references a missing column.</td><td>Use <code>describe_table</code> or Doris metadata to verify the schema.</td></tr>
+    <tr><td>Duplicate metric or model name</td><td>Two YAML files export the same object name.</td><td>Rename one object or delete the duplicate file.</td></tr>
+    <tr><td>Semantic layer not initialized</td><td>The workspace has no committed valid model, or bootstrap failed.</td><td>Open the Web UI, validate staging, and inspect the error message.</td></tr>
+  </table>
+
+  <h2 id="management">10. Managing Models</h2>
+  <p>Model changes follow a strict staging workflow:</p>
+<pre><code>stage YAML changes -> Validate -> Commit -> automatic reload -> healthy workspace
+</code></pre>
+  <p>Only the Doris <code>admin</code> user can create, edit, delete, validate, commit, discard, or deploy example models. Authenticated non-admin users can inspect models and query data with their own Doris permissions.</p>
+</div>
+</section>
+
+<section id="panel-server" class="doc-panel" role="tabpanel" aria-labelledby="tab-server">
+<header>
+  <h1>Doris MCP User Guide</h1>
+  <p>Connect AI agents, manage semantic models, and query Apache Doris through MCP.</p>
+</header>
+<div class="container">
+  <div class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#server-connect-agent">Connect an AI agent</a></li>
+      <li><a href="#server-tools">Available MCP tools</a></li>
+      <li><a href="#server-workflow">Recommended agent workflow</a></li>
+      <li><a href="#server-cli">CLI client</a></li>
+      <li><a href="#server-query-examples">Query examples</a></li>
+      <li><a href="#server-faq">FAQ</a></li>
+    </ol>
+  </div>
+
+  <h2 id="server-connect-agent">1. Connect an AI Agent</h2>
+  <p>Ask your administrator for the MCP Server URL, your Doris username/password, and the workspace name that contains semantic models. The default workspace for the bundled sample is <code>example</code>.</p>
+
+  <h3>Claude Desktop / Claude Code</h3>
+<pre><code>claude mcp add --transport http doris http://&lt;host&gt;:3000/mcp \
+  --header "Authorization: Bearer &lt;user&gt;:&lt;password&gt;"
+</code></pre>
+
+  <h3>Cursor / VS Code</h3>
+<pre><code>{
+  "mcpServers": {
+    "doris": {
+      "type": "http",
+      "url": "http://&lt;host&gt;:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer &lt;user&gt;:&lt;password&gt;"
+      }
+    }
+  }
+}
+</code></pre>
+
+  <p>Verify the connection by asking the agent to check service health. The agent should call <code>check_service_health</code> and report <code>"doris": "connected"</code>.</p>
+
+  <h2 id="server-tools">2. Available MCP Tools</h2>
+  <table>
+    <tr><th>Tool</th><th>Purpose</th></tr>
+    <tr><td><code>get_query_guide</code></td><td>Mandatory first step. Returns workflow rules, semantic layer routing, raw SQL fallback rules, and query syntax.</td></tr>
+    <tr><td><code>check_service_health</code></td><td>Returns Doris connectivity and each workspace status: healthy, no_models, or not_ready.</td></tr>
+    <tr><td><code>list_metrics</code></td><td>Lists available metrics in a workspace.</td></tr>
+    <tr><td><code>list_dimensions_for_metric</code></td><td>Lists valid group_by dimensions for one metric.</td></tr>
+    <tr><td><code>query_metric</code></td><td>Primary tool for counts, sums, rates, averages, rankings, and trends. Compiles and executes semantic SQL.</td></tr>
+    <tr><td><code>reload_semantic_layer</code></td><td>Manually reloads a workspace after model changes.</td></tr>
+    <tr><td><code>list_databases</code></td><td>Lists Doris databases for raw SQL fallback or metadata discovery.</td></tr>
+    <tr><td><code>list_tables</code></td><td>Lists tables in a database.</td></tr>
+    <tr><td><code>describe_table</code></td><td>Returns physical table schema at names, summary, or full detail.</td></tr>
+    <tr><td><code>execute_query</code></td><td>Raw SQL fallback. Only SELECT, SHOW, DESCRIBE, and EXPLAIN are allowed.</td></tr>
+  </table>
+
+  <h2 id="server-workflow">3. Recommended Agent Workflow</h2>
+<pre><code>get_query_guide()
+check_service_health()
+if a healthy workspace exists:
+  list_metrics(workspace)
+  list_dimensions_for_metric(workspace, metric_name)
+  query_metric(workspace, metrics, group_by, where, order_by, limit, having)
+else:
+  list_databases()
+  list_tables(database)
+  describe_table(database, table)
+  execute_query(sql)
+</code></pre>
+  <div class="callout">
+    If the semantic layer is healthy and a matching metric exists, use <code>query_metric</code>. Do not bypass it with raw SQL.
+  </div>
+
+  <h2 id="server-cli">4. CLI Client</h2>
+  <p>The <code>doris-mcp-client</code> command line client calls MCP tools and manages semantic model files through the same Bearer authentication.</p>
+<pre><code>export DORIS_MCP_SERVER=http://&lt;host&gt;:3000
+export DORIS_MCP_TOKEN=&lt;user&gt;:&lt;password&gt;
+
+# List tools and inspect arguments
+./mcp-client.sh tool list
+./mcp-client.sh tool describe query_metric
+
+# Call tools
+./mcp-client.sh tool call check_service_health
+./mcp-client.sh tool call list_metrics --json '{"workspace":"example"}'
+./mcp-client.sh tool call query_metric --json '{"workspace":"example","metrics":["total_amount"],"group_by":["channel"]}'
+
+# Manage semantic model files
+./mcp-client.sh semantic list -w example
+./mcp-client.sh semantic push ./models -w example
+./mcp-client.sh semantic pull -o ./backup -w example
+./mcp-client.sh semantic reload -w example
+./mcp-client.sh semantic status
+</code></pre>
+
+  <h2 id="server-query-examples">5. Query Examples</h2>
+  <h3>Explore metadata</h3>
+<pre><code>User: List all databases.
+AI: calls list_databases
+
+User: List tables in the dw database.
+AI: calls list_tables
+
+User: Show the schema for dw.orders.
+AI: calls describe_table
+</code></pre>
+
+  <h3>Query semantic metrics</h3>
+<pre><code>User: What is the total order amount by channel for the last 7 days?
+AI:
+  1. calls get_query_guide
+  2. calls check_service_health
+  3. calls list_metrics and matches total_amount
+  4. calls list_dimensions_for_metric and verifies channel
+  5. calls query_metric with metrics=["total_amount"], group_by=["channel"]
+</code></pre>
+
+  <h3>Raw SQL fallback</h3>
+<pre><code>User: Show the top 10 rows from dw.orders.
+AI: calls execute_query with a read-only SELECT statement
+</code></pre>
+
+  <h2 id="server-faq">6. FAQ</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Connection returns 401</td><td>Confirm the token format is <code>username:password</code>, separated with an ASCII colon.</td></tr>
+    <tr><td>Semantic query says workspace not found</td><td>Confirm the workspace name. The bundled sample uses <code>example</code>.</td></tr>
+    <tr><td>Can write SQL be executed?</td><td>No. <code>execute_query</code> allows read-only SQL only.</td></tr>
+    <tr><td>Queries are slow</td><td>Add <code>LIMIT</code>, reduce the time range, or use semantic dimensions to narrow the query.</td></tr>
+    <tr><td>Which metrics are available?</td><td>Call <code>list_metrics</code> or run <code>./mcp-client.sh tool call list_metrics --json '{"workspace":"example"}'</code>.</td></tr>
+  </table>
+</div>
+</section>
+
+<footer>Doris MCP Server documentation - MetricFlow v0.209.0 - Apache Doris adapter</footer>
+
+<script>
+const buttons = Array.from(document.querySelectorAll(".tab-button"));
+const panels = Array.from(document.querySelectorAll(".doc-panel"));
+buttons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const selected = button.dataset.tab;
+    buttons.forEach((b) => {
+      const active = b === button;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    panels.forEach((panel) => {
+      panel.classList.toggle("active", panel.id === `panel-${selected}`);
+    });
+  });
+});
+</script>
+</body>
+</html>

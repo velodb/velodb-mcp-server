@@ -2,22 +2,21 @@
 """
 Web UI & REST API test cases
 
-Covers:
+Coverage:
   - Web UI page access (login, models, file editor)
   - REST API (semantic push/pull/validate/commit)
   - Workspace management API (create/delete)
-  - Authentication (login, logout, session)
+  - Auth (login, logout, session)
 
 Usage:
   python test/test_web_api.py
 
 Environment variables:
-  MCP_BASE_URL               Server address (default http://localhost:3000)
+  MCP_BASE_URL               Server URL (default http://localhost:3000)
   MCP_TOKEN                  Bearer token (default admin:admin)
-  VELODB_USER / VELODB_PASS    VeloDB login credentials (default admin / admin)
-  VELODB_MCP_TEST_DESTRUCTIVE=1  enables destructive test cases (discarding
-                                staged changes, creating/deleting workspaces);
-                                skipped by default
+  DORIS_USER / DORIS_PASS    Doris login credentials (default admin / admin)
+  DORIS_MCP_TEST_DESTRUCTIVE=1  Enable destructive cases (discard staging
+                                changes and create/delete workspaces).
 """
 
 import json
@@ -29,15 +28,15 @@ import urllib.error
 import http.cookiejar
 from urllib.parse import urlencode
 
-# ── Configuration ────────────────────────────────────
+# ── Configuration ─────────────────────────────────────────
 BASE_URL = os.environ.get("MCP_BASE_URL", "http://localhost:3000")
 AUTH_TOKEN = os.environ.get("MCP_TOKEN", "admin:admin")
 WORKSPACE = os.environ.get("MCP_WORKSPACE", "example")
-TEST_VELODB_USER = os.environ.get("VELODB_USER", "admin")
-TEST_VELODB_PASS = os.environ.get("VELODB_PASS", "admin")
-# Destructive cases (discard real staged changes on a shared server, create/delete workspaces)
-# Skipped by default; only run when VELODB_MCP_TEST_DESTRUCTIVE=1 is set explicitly
-DESTRUCTIVE = os.environ.get("VELODB_MCP_TEST_DESTRUCTIVE") == "1"
+TEST_DORIS_USER = os.environ.get("DORIS_USER", "admin")
+TEST_DORIS_PASS = os.environ.get("DORIS_PASS", "admin")
+# Destructive cases can discard real staging changes and create/delete
+# workspaces on a shared server. They are skipped unless explicitly enabled.
+DESTRUCTIVE = os.environ.get("DORIS_MCP_TEST_DESTRUCTIVE") == "1"
 
 HEADERS = {
     "Authorization": f"Bearer {AUTH_TOKEN}",
@@ -49,19 +48,18 @@ JSON_HEADERS = {
 
 
 def _require_destructive():
-    """Guard for destructive cases: skip unless VELODB_MCP_TEST_DESTRUCTIVE=1 is set."""
+    """Skip destructive cases unless DORIS_MCP_TEST_DESTRUCTIVE=1 is set."""
     if not DESTRUCTIVE:
         raise unittest.SkipTest(
-            "Skipping: destructive cases require VELODB_MCP_TEST_DESTRUCTIVE=1"
+            "Skipped: destructive cases require DORIS_MCP_TEST_DESTRUCTIVE=1"
         )
 
 
 def _server_reachable() -> bool:
-    """Probe whether the MCP Server is reachable (the login page should return 200).
+    """Probe whether the MCP Server is reachable (login page should return 200).
 
-    Only a 200 counts: connection refused means it is not started; 502/404 etc.
-    mean the port is occupied by another service, which is also treated as
-    unreachable to avoid running the full suite against the wrong target.
+    Only 200 is accepted: connection refused means the server is not running,
+    while 502/404 suggests another service is bound to the port.
     """
     req = urllib.request.Request(f"{BASE_URL}/mcp/web/login", headers={})
     try:
@@ -72,7 +70,7 @@ def _server_reachable() -> bool:
 
 
 def _get(path: str, headers: dict = None, expect_code: int = 200) -> dict:
-    """GET request, returns (status_code, body_dict)"""
+    """GET request, returning (status_code, body_dict)."""
     req = urllib.request.Request(f"{BASE_URL}{path}", headers=headers or HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -89,7 +87,7 @@ def _get(path: str, headers: dict = None, expect_code: int = 200) -> dict:
 
 def _post(path: str, data: dict = None, headers: dict = None,
           expect_code: int = 200) -> tuple:
-    """POST request"""
+    """POST request."""
     req = urllib.request.Request(
         f"{BASE_URL}{path}",
         data=json.dumps(data).encode() if data else None,
@@ -113,19 +111,21 @@ def _post(path: str, data: dict = None, headers: dict = None,
 # ═══════════════════════════════════════════════════════
 
 def test_webui_login_page():
-    """GET /mcp/web/login — should return the login page HTML"""
+    """GET /mcp/web/login — should return the login page HTML."""
     status, body = _get("/mcp/web/login", headers={}, expect_code=200)
     assert "html" in str(body).lower() or "login" in str(body).lower(), \
         f"Should return login page: {str(body)[:200]}"
-    print("  ✅ Login page accessible")
+    assert "Semantic Web UI" in str(body), \
+        f"Login page should identify Semantic Web UI: {str(body)[:200]}"
+    print("  ✅ Semantic Web UI login page is accessible")
 
 
 def test_webui_login_post():
-    """POST /mcp/web/login — log in with VeloDB credentials"""
+    """POST /mcp/web/login — log in with Doris credentials."""
     import urllib.parse
     form_data = urlencode({
-        "username": TEST_VELODB_USER,
-        "password": TEST_VELODB_PASS,
+        "username": TEST_DORIS_USER,
+        "password": TEST_DORIS_PASS,
     }).encode()
     req = urllib.request.Request(
         f"{BASE_URL}/mcp/web/login",
@@ -137,29 +137,29 @@ def test_webui_login_post():
             cookies = resp.headers.get_all("Set-Cookie")
             assert resp.status in (200, 302, 303, 400), f"Unexpected status: {resp.status}"
             # 400 may occur if already logged in or missing CSRF, still means endpoint works
-            print(f"  ✅ Login endpoint responded status={resp.status}")
+            print(f"  ✅ Login endpoint responded with status={resp.status}")
     except urllib.error.HTTPError as e:
         if e.code in (302, 303):
             print(f"  ✅ Login succeeded (redirect {e.code})")
         elif e.code == 400:
-            print(f"  ✅ Login endpoint accessible (400, possibly missing CSRF token)")
+            print("  ✅ Login endpoint is accessible (400, possibly missing CSRF token)")
         else:
             raise
 
 
 def test_webui_requires_auth():
-    """GET /mcp/web — should return the login page or 401 when not logged in"""
+    """GET /mcp/web — unauthenticated access should return the login page or 401."""
     status, body = _get("/mcp/web", headers={}, expect_code=200)
-    # When not logged in it may return 401 or redirect to the login page
+    # Unauthenticated requests may return 401 or redirect to the login page.
     assert status in (200, 401, 302), f"Unexpected status: {status}"
     print(f"  ✅ Unauthenticated access returned {status}")
 
 
 def test_webui_models_page():
-    """GET /mcp/web/models — authenticated access"""
+    """GET /mcp/web/models — authenticated access."""
     status, body = _get("/mcp/web/models")
     assert status == 200, f"Expected 200, got {status}: {str(body)[:200]}"
-    print("  ✅ Model management page accessible")
+    print("  ✅ Model management page is accessible")
 
 
 # ═══════════════════════════════════════════════════════
@@ -167,7 +167,7 @@ def test_webui_models_page():
 # ═══════════════════════════════════════════════════════
 
 def test_api_semantic_files_list():
-    """GET /mcp/web/semantic/files — list live files"""
+    """GET /mcp/web/semantic/files — list active files."""
     status, body = _get("/mcp/web/semantic/files")
     assert status == 200
     assert body.get("success") is not False, f"Failed: {body}"
@@ -175,7 +175,7 @@ def test_api_semantic_files_list():
 
 
 def test_api_semantic_pull():
-    """GET /mcp/web/semantic/pull — download live YAML (.tar.gz binary)"""
+    """GET /mcp/web/semantic/pull — download active YAML (.tar.gz binary)."""
     req = urllib.request.Request(f"{BASE_URL}/mcp/web/semantic/pull", headers=HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -187,20 +187,20 @@ def test_api_semantic_pull():
             print(f"  ✅ pull: status={resp.status}, size={size}B, gzip={is_gzip}")
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            print(f"  ✅ pull: 404 (no files)")
+            print("  ✅ pull: 404 (no files)")
         else:
             raise
 
 
 def test_api_semantic_reload():
-    """POST /mcp/web/semantic/reload — reload a workspace"""
+    """POST /mcp/web/semantic/reload — reload workspace."""
     status, body = _post("/mcp/web/semantic/reload", {"workspace": WORKSPACE})
     assert status == 200
     print(f"  ✅ reload: {json.dumps(body, ensure_ascii=False)[:200]}")
 
 
 def test_api_staging_validate():
-    """POST /mcp/web/staging/validate — validate staged changes"""
+    """POST /mcp/web/staging/validate — validate staged changes."""
     status, body = _post("/mcp/web/staging/validate", {"workspace": WORKSPACE})
     assert status == 200
     assert "success" in body, f"Missing success field: {body}"
@@ -208,9 +208,9 @@ def test_api_staging_validate():
 
 
 def test_api_staging_discard():
-    """POST /mcp/web/staging/discard — discard staged changes
+    """POST /mcp/web/staging/discard — discard staged changes.
 
-    Destructive: discards staged changes of real users on a shared server; skipped by default.
+    Destructive: can discard real staging changes on a shared server; skipped by default.
     """
     _require_destructive()
     status, body = _post("/mcp/web/staging/discard", {"workspace": WORKSPACE})
@@ -223,17 +223,17 @@ def test_api_staging_discard():
 # ═══════════════════════════════════════════════════════
 
 def test_api_workspace_create_and_delete():
-    """Create → verify → delete a workspace
+    """Create → validate → delete a workspace.
 
     Destructive: creates/deletes a real workspace on the server; skipped by default.
     """
     _require_destructive()
     test_ws = "test_workspace_tmp"
 
-    # Clean up leftovers
+    # Clean up leftovers.
     _post("/mcp/web/workspace/delete", {"workspace": test_ws}, expect_code=200)
 
-    # Create
+    # Create.
     status, body = _post("/mcp/web/workspace/create", {
         "name": test_ws,
     }, expect_code=200)
@@ -241,7 +241,7 @@ def test_api_workspace_create_and_delete():
         f"Create failed: status={status} body={json.dumps(body, ensure_ascii=False)[:200]}"
     print(f"  ✅ Created workspace '{test_ws}': {json.dumps(body, ensure_ascii=False)[:150]}")
 
-    # Verify existence — via health check
+    # Verify existence through health check.
     import urllib.request as ur
     mcp_payload = {
         "jsonrpc": "2.0", "id": 99,
@@ -261,21 +261,21 @@ def test_api_workspace_create_and_delete():
     with ur.urlopen(req, timeout=15) as resp:
         raw = resp.read().decode()
     assert test_ws in raw, f"New workspace not found in health: {raw[:500]}"
-    print(f"  ✅ Workspace '{test_ws}' visible in health check")
+    print(f"  ✅ Workspace '{test_ws}' is visible in health check")
 
-    # Delete
+    # Delete.
     status, body = _post("/mcp/web/workspace/delete", {"workspace": test_ws})
     assert status == 200
     print(f"  ✅ Deleted workspace '{test_ws}'")
 
 
 # ═══════════════════════════════════════════════════════
-#  Authentication tests
+#  Auth tests
 # ═══════════════════════════════════════════════════════
 
 def test_api_requires_admin_for_create():
-    """Non-admin users cannot create workspaces"""
-    # Use the test user's token
+    """Non-admin users cannot create workspaces."""
+    # Use test user token.
     test_headers = {
         "Content-Type": "application/json",
         "Authorization": "Bearer test:test",
@@ -287,15 +287,15 @@ def test_api_requires_admin_for_create():
         expect_code=403,
     )
     assert status in (401, 403), f"Expected 401/403, got {status}: {body}"
-    print(f"  ✅ test user cannot create workspaces ({status})")
+    print(f"  ✅ test user cannot create workspace ({status})")
 
 
 def test_bearer_token_format():
-    """Verify the Bearer token format: username:password"""
-    # Correct format
+    """Verify Bearer token format: username:password."""
+    # Correct format.
     ok_headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {TEST_VELODB_USER}:{TEST_VELODB_PASS}",
+        "Authorization": f"Bearer {TEST_DORIS_USER}:{TEST_DORIS_PASS}",
         "Accept": "application/json, text/event-stream",
     }
     payload = {
@@ -311,7 +311,7 @@ def test_bearer_token_format():
     with urllib.request.urlopen(req, timeout=15) as resp:
         body = resp.read().decode()
     assert "connected" in body.lower(), f"Auth failed with valid token: {body[:300]}"
-    print("  ✅ Correct Bearer token format verified")
+    print("  ✅ Correct Bearer token format passed")
 
 
 # ═══════════════════════════════════════════════════════
@@ -323,7 +323,7 @@ if __name__ == "__main__":
     print("=" * 60)
 
     if not _server_reachable():
-        print(f"\n⚠️ MCP Server unreachable ({BASE_URL}), skipping entirely; not counted as failure")
+        print(f"\n⚠️ MCP Server is unreachable ({BASE_URL}); skipping all tests without failure")
         sys.exit(0)
 
     tests = [

@@ -14,9 +14,9 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from store.store import _get_conn, set_velodb_port as _store_set_port
+from store.store import _get_conn, set_doris_port as _store_set_port
 
-logger = logging.getLogger("velodb_mcp_server.seed")
+logger = logging.getLogger("doris_new_mcp.seed")
 
 EXAMPLE_MODEL_FILENAMES = frozenset({
     "orders.yaml",
@@ -32,7 +32,7 @@ EXAMPLE_DATA_TABLES = frozenset({
 })
 
 
-def set_velodb_port(port: int) -> None:
+def set_doris_port(port: int) -> None:
     _store_set_port(port)
 
 # ---------------------------------------------------------------------------
@@ -113,19 +113,19 @@ _ORDERS_DATA = [
 ]
 
 _USERS_DATA = [
-    (1, "Alice",   "Beijing",   "VIP",     "2025-06-01"),
-    (2, "Bob",     "Shanghai",  "Regular", "2025-08-15"),
-    (3, "Charlie", "Shenzhen",  "VIP",     "2025-10-01"),
-    (4, "David",   "Hangzhou",  "Regular", "2026-01-10"),
-    (5, "Eve",     "Guangzhou", "Regular", "2026-02-01"),
+    (1, "Alex Chen", "Beijing", "VIP",      "2025-06-01"),
+    (2, "Bella Li",  "Shanghai", "Standard", "2025-08-15"),
+    (3, "Chris Wang", "Shenzhen", "VIP",    "2025-10-01"),
+    (4, "Dana Zhao", "Hangzhou", "Standard", "2026-01-10"),
+    (5, "Evan Sun",  "Guangzhou", "Standard", "2026-02-01"),
 ]
 
 _PRODUCTS_DATA = [
-    (1, "Wireless Earbuds", "Electronics",  "Sony",      199.00),
+    (1, "Wireless Earbuds",   "Electronics", "Sony",      199.00),
     (2, "Mechanical Keyboard", "Electronics", "Logitech", 599.00),
-    (3, "Running Shoes",    "Apparel",      "Nike",      299.00),
-    (4, "Backpack",         "Accessories",  "Samsonite", 199.00),
-    (5, "Smart Watch",      "Electronics",  "Huawei",    899.00),
+    (3, "Running Shoes",      "Apparel",     "Nike",      299.00),
+    (4, "Backpack",           "Accessories", "Samsonite", 199.00),
+    (5, "Smartwatch",         "Electronics", "Huawei",    899.00),
 ]
 
 # ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ _ORDERS_YAML = """---
 semantic_model:
   name: orders
   description: Orders table
-  label: Orders
+  label: Orders table
 
   db_table: dw.orders
 
@@ -161,7 +161,7 @@ semantic_model:
     - name: order_count
       expr: order_id
       agg: count_distinct
-      description: Number of orders
+      description: Order count
     - name: avg_amount
       expr: amount
       agg: average
@@ -169,7 +169,7 @@ semantic_model:
     - name: unique_users
       expr: user_id
       agg: count_distinct
-      description: Users who placed orders
+      description: Ordering users
 
   dimensions:
     - name: order_date
@@ -177,7 +177,7 @@ semantic_model:
       type_params:
         time_granularity: day
       expr: order_date
-      label: Order Date
+      label: Order date
     - name: channel
       type: categorical
       label: Channel
@@ -190,7 +190,7 @@ _USERS_YAML = """---
 semantic_model:
   name: users
   description: Users table
-  label: Users
+  label: Users table
 
   db_table: dw.users
 
@@ -207,7 +207,7 @@ semantic_model:
     - name: user_count
       expr: user_id
       agg: count_distinct
-      description: Number of users
+      description: User count
 
   dimensions:
     - name: city
@@ -215,20 +215,20 @@ semantic_model:
       label: City
     - name: level
       type: categorical
-      label: Level
+      label: Customer level
     - name: register_date
       type: time
       type_params:
         time_granularity: day
       expr: register_date
-      label: Registration Date
+      label: Registration date
 """
 
 _PRODUCTS_YAML = """---
 semantic_model:
   name: products
   description: Products table
-  label: Products
+  label: Products table
 
   db_table: dw.products
 
@@ -242,7 +242,7 @@ semantic_model:
     - name: product_count
       expr: product_id
       agg: count_distinct
-      description: Number of products
+      description: Product count
       create_metric: false
 
   dimensions:
@@ -381,6 +381,11 @@ def seed_example_models() -> bool:
 
     finally:
         conn.close()
+    if performed:
+        # Direct active-store writes bypass staging_commit(), so publish an
+        # explicit semantic version for every MCP node to observe.
+        from store.store import DorisStore
+        DorisStore("example").bump_semantic_version()
     return performed
 
 
@@ -412,6 +417,14 @@ def delete_example() -> None:
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    "DELETE FROM system_mcp.workspace_metadata WHERE workspace = 'example'"
+                )
+            except Exception:
+                # Backward-compatible with deployments created before the
+                # metadata table existed.
+                pass
             cur.execute("DROP TABLE IF EXISTS system_mcp.staging_store_example")
             cur.execute("DROP TABLE IF EXISTS system_mcp.active_store_example")
             for table in sorted(EXAMPLE_DATA_TABLES):

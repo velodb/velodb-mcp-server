@@ -6,6 +6,7 @@ import asyncio
 import ipaddress
 import logging
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
@@ -23,7 +24,7 @@ if TYPE_CHECKING:
     from starlette.requests import Request
     from starlette.responses import Response
 
-    from store.store import VeloDBStore
+    from store.store import DorisStore
 
 from auth import check_tool_access, init_guard
 from config.loader import AppConfig
@@ -39,10 +40,21 @@ from tools.discovery import (
 )
 from tools.query import execute_query as _execute_query
 
-logger = logging.getLogger("velodb_mcp_server")
+logger = logging.getLogger("doris_new_mcp")
 
-_WEBUI_SESSION_COOKIE = "velodb_mcp_session"
+_WEBUI_SESSION_COOKIE = "doris_mcp_session"
 _ADMIN_USER = "admin"
+_SEMANTIC_WEB_UI_NAME = "Semantic Web UI"
+
+_SERVER_INSTRUCTIONS = (
+    "IMPORTANT: In each conversation context, call get_query_guide() once before "
+    "the first data query. Reuse that guide for every later query in the same "
+    "context; call it again only after a new or reset context. "
+    "Choose semantic metric tools when governed business metrics are relevant, and "
+    "use read-only SQL for explicit SQL, schema exploration, search queries, or when "
+    "no semantic metric matches. Semantic workspaces load only when semantic tools "
+    "or the Semantic Web UI are used."
+)
 
 # RFC 1918 private IPv4 networks (excludes loopback, link-local, etc.)
 _IPV4_RFC1918_NETS = (
@@ -50,6 +62,48 @@ _IPV4_RFC1918_NETS = (
     ipaddress.IPv4Network("172.16.0.0/12"),
     ipaddress.IPv4Network("192.168.0.0/16"),
 )
+
+
+def _roles_include_admin(roles: object) -> bool:
+    """Return whether a SHOW GRANTS Roles value contains the admin role."""
+    if roles is None:
+        return False
+    role_names = {
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9_]+", str(roles))
+    }
+    return "admin" in role_names
+
+
+def _doris_user_has_admin_role(conn: object, username: str) -> bool:
+    """Resolve Semantic Web UI edit access from the current Doris user.
+
+    SHOW GRANTS is deliberately executed without a FOR clause: every Doris
+    user may inspect their own effective grants, while inspecting another user
+    would require GRANT_PRIV.  Keep the built-in admin username as a fallback
+    for older Doris versions that do not expose a Roles column.
+    """
+    username_is_admin = username.lower() == _ADMIN_USER
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SHOW GRANTS")
+            columns = [str(item[0]).lower() for item in (cur.description or ())]
+            if "roles" not in columns:
+                return username_is_admin
+            roles_index = columns.index("roles")
+            return username_is_admin or any(
+                _roles_include_admin(row[roles_index])
+                for row in cur.fetchall()
+                if len(row) > roles_index
+            )
+    except Exception as exc:
+        logger.warning("Unable to resolve Doris roles for user '%s': %s", username, exc)
+        return username_is_admin
+
+
+def _session_has_admin_access(session: dict) -> bool:
+    """Read the role-derived authorization captured at Web UI login."""
+    return bool(session.get("is_admin", False))
 
 
 def _is_rfc1918_ipv4(ip: ipaddress.IPv4Address) -> bool:
@@ -60,6 +114,19 @@ def _is_rfc1918_ipv4(ip: ipaddress.IPv4Address) -> bool:
     :attr:`ipaddress.IPv4Address.is_private` would accept.
     """
     return any(ip in net for net in _IPV4_RFC1918_NETS)
+
+
+def _reload_error_code(msg: str) -> ErrorCode:
+    """Map a reload failure message to the most accurate error code.
+
+    Permission failures were previously hidden behind a generic INTERNAL_ERROR
+    ("Reload failed — check server logs"), which read as a server fault when
+    the real cause was the caller's credentials.
+    """
+    lowered = (msg or "").lower()
+    if any(k in lowered for k in ("permission", "denied", "privilege", "access", "forbidden", "grant")):
+        return ErrorCode.PERMISSION_DENIED
+    return ErrorCode.INTERNAL_ERROR
 
 
 def _encode_webui_session_cookie(session_id: str, server_ip: str) -> str:
@@ -226,14 +293,13 @@ def create_server(
 ) -> FastMCP:
     """Create and configure the MCP server."""
     if config_dir is None:
-        config_dir = os.environ.get("VELODB_MCP_CONFIG_DIR", "config")
+        config_dir = os.environ.get("DORIS_MCP_CONFIG_DIR", "config")
 
     config_path = os.path.abspath(config_dir)
     # Reuse a pre-built config when the caller (main.py) already parsed it,
     # so the TOML/dotenv files are read exactly once per process.
     cfg = config if config is not None else AppConfig(config_path, env_file=env_file)
     cc = cfg.cluster
-
     # Workspace directory
     workspace_dir = os.path.join(os.path.dirname(config_path), "workspace")
     os.makedirs(workspace_dir, exist_ok=True)
@@ -253,8 +319,8 @@ def create_server(
 
     # Multi-workspace watcher (lazy — discovered on first request)
     from store.watcher import MultiWorkspaceWatcher
-    from store.store import set_velodb_endpoint
-    set_velodb_endpoint(cc.fe_host, cc.fe_mysql_port)
+    from store.store import set_doris_endpoint
+    set_doris_endpoint(cc.fe_host, cc.fe_mysql_port)
     multi_watcher = MultiWorkspaceWatcher(
         config_dir=_Path(config_path),
         workspace_root=_ws_root,
@@ -265,7 +331,7 @@ def create_server(
     async def _deploy_example(user: str, password: str) -> bool:
         """Deploy example data/models with verified Admin credentials."""
         nonlocal _watcher_initialized
-        from store.seed import seed_all, set_velodb_port as seed_set_port
+        from store.seed import seed_all, set_doris_port as seed_set_port
         from store.store import set_request_credentials as _set_creds
 
         async with _example_lock:
@@ -294,7 +360,7 @@ def create_server(
     async def _delete_example(user: str, password: str) -> None:
         """Delete example deployment and detach it from the global router."""
         from store.seed import delete_example
-        from store.store import VeloDBStore, set_request_credentials as _set_creds
+        from store.store import DorisStore, set_request_credentials as _set_creds
 
         async with _example_lock:
             _set_creds(user, password)
@@ -302,7 +368,7 @@ def create_server(
             multi_watcher._workspaces.pop("example", None)
             multi_watcher._staging_validated.discard("example")
             multi_watcher.router.rebuild(multi_watcher._workspaces)
-            VeloDBStore._table_cache.pop("example", None)
+            DorisStore._table_cache.pop("example", None)
 
             import shutil as _shutil
             await asyncio.to_thread(
@@ -338,8 +404,8 @@ def create_server(
             logger.exception("Example deployment switch failed")
             _example_job.update(status="failed", message=str(exc))
 
-    async def _ensure_initialized(user: str, password: str) -> None:
-        """Initialize workspaces once authenticated credentials are available."""
+    async def _ensure_semantic_initialized(user: str, password: str) -> None:
+        """Initialize semantic workspaces after an explicit Semantic Web UI action."""
         nonlocal _watcher_initialized
         from store.store import set_request_credentials as _set_creds
 
@@ -391,7 +457,7 @@ def create_server(
     os.makedirs(os.path.dirname(audit_path), exist_ok=True)
     init_audit_log(audit_path, when=cfg.mcp.log_rotation_when, backup_count=cfg.mcp.log_rotation_backup_count)
 
-    # Per-user pool manager — all VeloDB connections use request credentials.
+    # Per-user pool manager — all Doris connections use request credentials.
     pool_manager: PoolManager | None = PoolManager(cc)
 
     init_guard(
@@ -402,7 +468,7 @@ def create_server(
     # Init health tracking
     from core.health import service_health
     service_health.reset()
-    service_health.get("velodb_connection").set_healthy(
+    service_health.get("doris_connection").set_healthy(
         f"Admin pool: {cc.fe_host}:{cc.fe_mysql_port}", user="admin")
     if cfg.auth is not None:
         if cfg.auth.static:
@@ -417,28 +483,27 @@ def create_server(
     else:
         service_health.get("auth").set_healthy("Auth disabled (no auth config)")
 
-    # Credential-based auth: username:password → VeloDB verification → 10-min cache
+    # Credential-based auth: username:password → Doris verification → 10-min cache
     from auth.credential_cache import CredentialCache
     from auth.credential_verifier import CredentialVerifier
     _credential_cache = CredentialCache(ttl_seconds=600)
 
     async def _async_verify_credentials(user: str, password: str) -> bool:
-        """Async wrapper for VeloDB credential verification."""
-        ok, _ = await asyncio.to_thread(_verify_velodb_credentials, user, password)
+        """Async wrapper for Doris credential verification."""
+        ok, _ = await asyncio.to_thread(_verify_doris_credentials, user, password)
         return ok
 
-    auth_provider = CredentialVerifier(_credential_cache, _async_verify_credentials,
-                                        on_authenticated=_ensure_initialized)
-    logger.info("Auth: CredentialVerifier registered (username:password, 10-min cache, lazy seed)")
+    auth_provider = CredentialVerifier(_credential_cache, _async_verify_credentials)
+    logger.info("Auth: CredentialVerifier registered (username:password, 10-min cache)")
 
     # Helper: get store for a workspace (defaults to "example")
     def _get_workspace_from_request(request: Request) -> str:
         """Extract workspace from query param for all methods."""
         return (request.query_params.get("workspace", "") or "example").strip()
 
-    def _get_store(workspace: str) -> VeloDBStore:
-        """Get or create a VeloDBStore for the given workspace."""
-        from store.store import VeloDBStore as _DS
+    def _get_store(workspace: str) -> DorisStore:
+        """Get or create a DorisStore for the given workspace."""
+        from store.store import DorisStore as _DS
         return _DS(workspace=workspace)
 
     from starlette.datastructures import UploadFile as _UploadFile
@@ -557,38 +622,38 @@ def create_server(
         try:
             return await _get_per_user_pool()
         except Exception as e:
-            logger.warning("%s: cannot acquire VeloDB connection: %s", tool_name, e)
+            logger.warning("%s: cannot acquire Doris connection: %s", tool_name, e)
             return error_response(
                 ErrorCode.CONNECTION_ERROR,
-                f"Cannot connect to VeloDB with the supplied credentials: {e}",
+                f"Cannot connect to Doris with the supplied credentials: {e}",
             )
 
-    # MCP node identity for session affinity. VeloDB connections use fe_host.
+    # MCP node identity for session affinity. Doris connections use fe_host.
     _MACHINE_IP = machine_ip if machine_ip is not None else resolve_machine_ip()
     _CONFIGURED_PRIVATE_IPS = get_configured_private_ips(_MACHINE_IP)
     logger.info("Configured private IPv4 addresses: %s", _CONFIGURED_PRIVATE_IPS)
 
-    def _verify_velodb_credentials(user: str, password: str) -> tuple[bool, bool]:
+    def _verify_doris_credentials(user: str, password: str) -> tuple[bool, bool]:
         import pymysql
         if _login_locked(user):
             # Same result as a wrong password — do not reveal lock state.
             return False, False
+        conn = None
         try:
             conn = pymysql.connect(
                 host=cc.fe_host, port=cc.fe_mysql_port,
                 user=user, password=password,
                 charset="utf8mb4", connect_timeout=5,
             )
-            conn.close()
+            is_admin = _doris_user_has_admin_role(conn, user)
             _record_login_success(user)
-            return True, (user == _ADMIN_USER)
+            return True, is_admin
         except Exception:
             _record_login_failure(user)
             return False, False
-
-    def _webui_redirect_login():
-        from starlette.responses import RedirectResponse as _R
-        return _R("/mcp/web/login", status_code=303)
+        finally:
+            if conn is not None:
+                conn.close()
 
     async def _check_semantic_access(
         request: Request, require_admin: bool = False,
@@ -606,15 +671,17 @@ def create_server(
             session_id, server_ip, session = None, None, None
         if session and session["server_ip"] == server_ip:
             if time.time() - session["created_at"] < _SESSION_TTL:
-                client_id = session["velodb_user"]
-                is_admin = (client_id == _ADMIN_USER)
+                client_id = session["doris_user"]
+                is_admin = _session_has_admin_access(session)
                 if require_admin and not is_admin:
                     return None, False, JSONResponse(
-                        {"success": False, "error": {"code": "PERMISSION_DENIED", "message": "Only admin can modify semantic models."}},
+                        {"success": False, "error": {"code": "PERMISSION_DENIED", "message": "Only users with the Doris admin role can modify semantic models or settings."}},
                         status_code=403)
                 from store.store import set_request_credentials
-                set_request_credentials(client_id, session.get("velodb_password", ""))
-                await _ensure_initialized(client_id, session.get("velodb_password", ""))
+                set_request_credentials(client_id, session.get("doris_password", ""))
+                await _ensure_semantic_initialized(
+                    client_id, session.get("doris_password", "")
+                )
                 return client_id, is_admin, None
             del _webui_sessions[session_id]
 
@@ -625,22 +692,23 @@ def create_server(
             parts = token_str.split(":", 1)
             username = parts[0]
             password = parts[1] if len(parts) > 1 else ""
-            ok, is_admin = await asyncio.to_thread(_verify_velodb_credentials, username, password)
+            ok, is_admin = await asyncio.to_thread(_verify_doris_credentials, username, password)
             if ok:
                 if require_admin and not is_admin:
                     return None, False, JSONResponse(
-                        {"success": False, "error": {"code": "PERMISSION_DENIED", "message": "Only admin can modify semantic models."}},
+                        {"success": False, "error": {"code": "PERMISSION_DENIED", "message": "Only users with the Doris admin role can modify semantic models or settings."}},
                         status_code=403)
                 from store.store import set_request_credentials
                 set_request_credentials(username, password)
-                await _ensure_initialized(username, password)
+                await _ensure_semantic_initialized(username, password)
                 return username, is_admin, None
             return None, False, JSONResponse(
                 {"success": False, "error": {"code": "UNAUTHORIZED", "message": "Invalid credentials"}},
                 status_code=401)
 
         if "text/html" in (request.headers.get("accept") or ""):
-            return None, False, _webui_redirect_login()
+            from starlette.responses import HTMLResponse as _HTML
+            return None, False, _HTML(_render_login())
         return None, False, JSONResponse(
             {"success": False, "error": {"code": "UNAUTHORIZED", "message": "Session expired or missing"}},
             status_code=401)
@@ -669,7 +737,7 @@ def create_server(
                     "success": False,
                     "error": {
                         "code": "UNAUTHORIZED",
-                        "message": "A valid Admin WebUI session is required.",
+                        "message": "A valid Semantic Web UI admin session is required.",
                     },
                 },
                 status_code=401,
@@ -682,42 +750,34 @@ def create_server(
                     "success": False,
                     "error": {
                         "code": "UNAUTHORIZED",
-                        "message": "Admin WebUI session has expired.",
+                        "message": "The Semantic Web UI admin session has expired.",
                     },
                 },
                 status_code=401,
             )
-        # The VeloDB admin username is fixed; its password remains request-scoped.
-        if not session.get("is_admin"):
+        if not _session_has_admin_access(session):
             return None, _JSONResponse(
                 {
                     "success": False,
                     "error": {
                         "code": "PERMISSION_DENIED",
-                        "message": "Only the Admin WebUI account can manage example.",
+                        "message": "Only users with the Doris admin role can manage the example in Semantic Web UI.",
                     },
                 },
                 status_code=403,
             )
 
         from store.store import set_request_credentials
-        set_request_credentials(session.get("velodb_user", ""), session.get("velodb_password", ""))
+        set_request_credentials(session.get("doris_user", ""), session.get("doris_password", ""))
         return session, None
 
     # Load query guide from package resource
     _query_guide = ""
     try:
         from importlib.resources import files
-        _query_guide = files("skills").joinpath("velodb-mcp-skill.md").read_text(encoding="utf-8")
+        _query_guide = files("skills").joinpath("doris-mcp-skill.md").read_text(encoding="utf-8")
     except Exception as e:
         logger.warning(f"Failed to load query guide: {e}")
-
-    _instructions = (
-        "IMPORTANT: Before any data query, call get_query_guide() to get the complete workflow. "
-        "Then call check_service_health() to see workspace status. "
-        "Each data query tool requires a workspace parameter — use 'example' to start. "
-        "Follow the guide strictly — do NOT improvise tool calling order."
-    )
 
     @asynccontextmanager
     async def _lifespan(app: "FastMCP"):
@@ -729,11 +789,11 @@ def create_server(
                     await pool_manager.close_all()
                 except Exception:
                     logger.exception("Failed during pool_manager.close_all()")
-            logger.info("All VeloDB connection pools closed")
+            logger.info("All Doris connection pools closed")
 
     mcp = FastMCP(
         name=cfg.mcp.name,
-        instructions=_instructions,
+        instructions=_SERVER_INSTRUCTIONS,
         auth=auth_provider,
         lifespan=_lifespan,
     )
@@ -744,11 +804,38 @@ def create_server(
 
     # ========== Base Tools (always registered) ==========
 
+    _discovery_description = (
+        "Discover physical Doris databases, tables, and columns directly. Use this for "
+        "explicit schema exploration or to prepare a read-only SQL query without loading "
+        "the semantic layer."
+    )
+    _execute_description = (
+        "Execute single-statement read-only Doris SQL directly. Semantic loading is not "
+        "required; DML, DDL, stacked statements, and OUTFILE are blocked."
+    )
+    _health_description = (
+        "Check Doris connectivity and report semantic workspaces already loaded on "
+        "demand; this check does not initialize the semantic layer."
+    )
+    _metric_description = (
+        "Semantic metric tool; loads the requested workspace on demand when governed "
+        "business metrics are relevant."
+    )
+
     @mcp.tool(
+        description=(
+            "Return the automatic query-routing and tool workflow guide. Call once "
+            "per conversation context and reuse it for subsequent queries."
+        ),
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def get_query_guide() -> str:
-        """CALL THIS FIRST before any data query. Returns the complete workflow guide: health check procedure, metric layer vs basic SQL routing, tool calling order, search strategies, and query syntax. Without this guide you will use tools incorrectly."""
+        """Call once before the first data query in a conversation context.
+
+        Returns the complete workflow guide: health checks, semantic versus raw SQL
+        routing, tool order, search strategies, and query syntax. Reuse the result
+        for later queries in the same context.
+        """
         auth = check_tool_access("get_query_guide")
         if auth.denied:
             return auth.denied
@@ -762,6 +849,7 @@ def create_server(
         return result
 
     @mcp.tool(
+        description=_discovery_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def list_databases(page_size: int = 50, page_token: str = "") -> str:
@@ -779,6 +867,7 @@ def create_server(
         return result
 
     @mcp.tool(
+        description=_discovery_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def list_tables(
@@ -801,6 +890,7 @@ def create_server(
         return result
 
     @mcp.tool(
+        description=_discovery_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def describe_table(database: str, table: str, detail_level: str = "summary") -> str:
@@ -820,10 +910,11 @@ def create_server(
         return result
 
     @mcp.tool(
+        description=_execute_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=False, openWorldHint=False)
     )
     async def execute_query(sql: str, database: str = "", max_rows: int = 0) -> str:
-        """Raw SQL fallback. Always returns error format — read the message to decide next step. If metrics exist for this query, switch to query_metric. If no matching metric, the data is in the error details. Supports SHOW/DESCRIBE, CTEs, JOINs, UNION ALL."""
+        """Raw SQL fallback. Always returns error format — read the message to decide next step. If metrics exist for this query, switch to query_metric. If no matching metric, the data is in the error details. Supports single-statement read-only Doris SQL, including Doris-specific SELECT syntax, SHOW/DESCRIBE, CTEs, JOINs, and UNION ALL."""
         auth = check_tool_access("execute_query")
         if auth.denied:
             return auth.denied
@@ -852,34 +943,36 @@ def create_server(
         return result
 
     @mcp.tool(
+        description=_health_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def check_service_health() -> str:
-        """FIRST TOOL to call at the start of any session. Returns velodb connectivity and all workspace statuses. Use to determine which workspaces are available."""
+        """FIRST TOOL to call at the start of any session. Returns doris connectivity and all workspace statuses. Use to determine which workspaces are available."""
         auth = check_tool_access("check_service_health")
         if auth.denied:
             return auth.denied
         start = time.monotonic()
 
-        # Verify VeloDB DB connectivity (use per-user pool with request credentials)
+        # Verify Doris DB connectivity (use per-user pool with request credentials)
         db_ok = False
         db_error = ""
         health_pool = await _acquire_pool("check_service_health")
         try:
             if isinstance(health_pool, str):
-                raise RuntimeError("credentials rejected by VeloDB")
+                raise RuntimeError("credentials rejected by Doris")
             await health_pool.execute("SELECT 1")
             db_ok = True
         except Exception as e:
             db_error = str(e)
 
         if db_ok:
-            service_health.get("velodb_connection").set_healthy(
-                f"VeloDB FE {cc.fe_host}:{cc.fe_mysql_port}", user="admin")
+            service_health.get("doris_connection").set_healthy(
+                f"Doris FE {cc.fe_host}:{cc.fe_mysql_port}", user="admin")
         else:
-            service_health.get("velodb_connection").set_error(f"Connection failed: {db_error}")
+            service_health.get("doris_connection").set_error(f"Connection failed: {db_error}")
 
-        # Ensure all known workspaces are loaded (on-demand)
+        # Refresh only workspaces already loaded on demand. A health check must
+        # not discover or bootstrap the semantic layer merely by being called.
         for ws_name in multi_watcher.workspace_names():
             await asyncio.to_thread(multi_watcher.ensure_fresh, ws_name)
 
@@ -889,50 +982,94 @@ def create_server(
             ws = multi_watcher.get_workspace(ws_name)
             if not ws:
                 continue
-            if ws.manifest and ws.compiler:
+            loaded = ws.version_tracker.current
+            version_data = {
+                "semantic_enabled": ws.enabled,
+                "semantic_version": ws.published_version,
+                "loaded_version": loaded.semantic_version if loaded else None,
+                "loaded_at": loaded.loaded_at if loaded else None,
+            }
+            # ws.is_ready() is the same single source of truth the metric tools
+            # gate on, so health can never disagree with list_metrics/query_metric.
+            if not ws.enabled:
+                ws_statuses[ws_name] = {
+                    "status": "disabled",
+                    **version_data,
+                }
+            elif ws.is_ready():
                 metrics = ws.manifest.list_metrics()
-                if ws.compiler.is_engine_mode:
-                    ws_statuses[ws_name] = {
-                        "status": "healthy",
-                        "metric_count": len(metrics),
-                    }
-                else:
-                    ws_statuses[ws_name] = {
-                        "status": "not_ready",
-                        "message": "Engine init failed — check model YAML (e.g., missing agg_time_dimension)",
-                    }
+                ws_statuses[ws_name] = {
+                    "status": "healthy",
+                    "metric_count": len(metrics),
+                    **version_data,
+                }
+            elif loaded is not None and not loaded.last_reload_success:
+                ws_statuses[ws_name] = {
+                    "status": "reload_failed",
+                    "message": ws.last_reload_error or "Semantic layer reload failed",
+                    **version_data,
+                }
+            elif ws.manifest and ws.compiler:
+                # Manifest loaded but the MetricFlow engine failed to initialize —
+                # surface the real cause, not a generic hint.
+                err = getattr(ws.compiler, "init_error", "") or "Engine init failed"
+                ws_statuses[ws_name] = {
+                    "status": "not_ready",
+                    "message": f"Engine init failed: {err}",
+                    **version_data,
+                }
             else:
                 files = await asyncio.to_thread(ws.store.list_files)
                 if not files:
                     ws_statuses[ws_name] = {
                         "status": "no_models",
                         "message": "No YAML files uploaded",
+                        **version_data,
                     }
                 else:
                     ws_statuses[ws_name] = {
                         "status": "not_ready",
-                        "message": "Files present but failed to load",
+                        "message": ws.last_reload_error or "Files present but failed to load",
+                        **version_data,
                     }
 
         health_data = {
-            "velodb": "connected" if db_ok else "unavailable",
+            "doris": "connected" if db_ok else "unavailable",
             "workspaces": ws_statuses,
+            "semantic": {
+                "status": "loaded" if multi_watcher.workspace_names() else "not_loaded",
+            },
         }
         if not db_ok:
-            health_data["velodb_error"] = db_error
+            health_data["doris_error"] = db_error
 
         log_tool_call("check_service_health", client_id=auth.client_id,
                       duration_ms=(time.monotonic() - start) * 1000, metricflow=False)
         return success_response(health_data)
 
-    # ========== Metric Layer Tools (always registered, gated at runtime) ==========
+    # ========== Metric Layer Tools (loaded on demand) ==========
 
-    from tools.semantic import (
-        list_metrics as _list_metrics,
-        list_dimensions_for_metric as _list_dims,
-        query_metric as _query_metric,
-    )
+    def _semantic_workspace_error(ws, workspace: str) -> str | None:
+        if ws is None:
+            return error_response(
+                ErrorCode.SERVICE_NOT_READY,
+                f"Semantic workspace '{workspace}' was not found or could not be checked",
+            )
+        if not ws.enabled:
+            return error_response(
+                ErrorCode.SEMANTIC_DISABLED,
+                f"Semantic queries are disabled for workspace '{workspace}'",
+            )
+        if not ws.is_ready():
+            return error_response(
+                ErrorCode.SERVICE_NOT_READY,
+                ws.last_reload_error
+                or f"Semantic layer not initialized for workspace '{workspace}'",
+            )
+        return None
+
     @mcp.tool(
+        description=_metric_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def list_metrics(workspace: str, page_size: int = 50, page_token: str = "") -> str:
@@ -942,14 +1079,16 @@ def create_server(
             return auth.denied
         start = time.monotonic()
         ws = await asyncio.to_thread(multi_watcher.ensure_fresh, workspace)
-        if not ws or not ws.manifest or not ws.compiler:
-            return error_response(ErrorCode.SERVICE_NOT_READY, f"Semantic layer not initialized for workspace '{workspace}'")
+        if semantic_error := _semantic_workspace_error(ws, workspace):
+            return semantic_error
+        from tools.semantic import list_metrics as _list_metrics
         result = await _list_metrics(ws.manifest, page_size, page_token or None)
         log_tool_call("list_metrics", client_id=auth.client_id,
                       duration_ms=(time.monotonic() - start) * 1000, metricflow=True)
         return result
 
     @mcp.tool(
+        description=_metric_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def list_dimensions_for_metric(workspace: str, metric_name: str) -> str:
@@ -959,14 +1098,16 @@ def create_server(
             return auth.denied
         start = time.monotonic()
         ws = await asyncio.to_thread(multi_watcher.ensure_fresh, workspace)
-        if not ws or not ws.manifest or not ws.compiler:
-            return error_response(ErrorCode.SERVICE_NOT_READY, f"Semantic layer not initialized for workspace '{workspace}'")
+        if semantic_error := _semantic_workspace_error(ws, workspace):
+            return semantic_error
+        from tools.semantic import list_dimensions_for_metric as _list_dims
         result = await _list_dims(ws.manifest, metric_name)
         log_tool_call("list_dimensions_for_metric", client_id=auth.client_id, params={"metric_name": metric_name},
                       duration_ms=(time.monotonic() - start) * 1000, metricflow=True)
         return result
 
     @mcp.tool(
+        description=_metric_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=False, openWorldHint=False)
     )
     async def query_metric(
@@ -986,8 +1127,8 @@ def create_server(
             return auth.denied
         start = time.monotonic()
         ws = await asyncio.to_thread(multi_watcher.ensure_fresh, workspace)
-        if not ws or not ws.manifest or not ws.compiler:
-            return error_response(ErrorCode.SERVICE_NOT_READY, f"Semantic layer not initialized for workspace '{workspace}'")
+        if semantic_error := _semantic_workspace_error(ws, workspace):
+            return semantic_error
         if group_by:
             group_by = ws.compiler.resolve_group_by(metrics, group_by)
         if order_by:
@@ -999,6 +1140,7 @@ def create_server(
         if isinstance(pool, str):
             return pool
 
+        from tools.semantic import query_metric as _query_metric
         result = await _query_metric(ws.compiler, pool, metrics, group_by or None, where or None, order_by or None, limit or None, database or None, max_rows or None, having or None)
         duration = (time.monotonic() - start) * 1000
         success = '"success": true' in result
@@ -1011,6 +1153,7 @@ def create_server(
 
     # ========== Manual reload Tool ==========
     @mcp.tool(
+        description=_metric_description,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def reload_semantic_layer(workspace: str) -> str:
@@ -1021,12 +1164,27 @@ def create_server(
         ws = await asyncio.to_thread(multi_watcher.ensure_fresh, workspace)
         if not ws:
             return error_response(ErrorCode.VALIDATION_ERROR, f"Workspace not found: {workspace}")
+        if not ws.enabled:
+            return error_response(
+                ErrorCode.SEMANTIC_DISABLED,
+                f"Semantic queries are disabled for workspace '{workspace}'",
+            )
         status, msg = await asyncio.to_thread(multi_watcher.force_reload, workspace)
         log_tool_call("reload_semantic_layer", client_id=auth.client_id,
                       success=(status == "done"), duration_ms=0, metricflow=True)
-        if status == "failed":
-            return error_response(ErrorCode.INTERNAL_ERROR, msg)
-        return success_response({"status": status, "message": msg})
+        # Only "done" (and idempotent "already_running") are successes. A
+        # failure must never ride inside a success:true envelope.
+        if status == "done":
+            return success_response({"status": status, "message": msg})
+        if status == "already_running":
+            # Informational — a reload is already in progress, not a failure
+            return success_response({"status": status, "message": msg})
+        if status == "rejected":
+            return error_response(ErrorCode.VALIDATION_ERROR, msg)
+        if status == "disabled":
+            return error_response(ErrorCode.SEMANTIC_DISABLED, msg)
+        # status == "failed" — surface the underlying error, not a generic wrapper
+        return error_response(_reload_error_code(msg), msg)
 
 
     @mcp.custom_route("/mcp/web/semantic/reload", methods=["POST"])
@@ -1045,9 +1203,16 @@ def create_server(
         status, msg = await asyncio.to_thread(multi_watcher.force_reload, ws)
         log_tool_call("reload_semantic_layer", client_id=client_id,
                       success=(status == "done"), duration_ms=0, metricflow=True)
-        if status in ("rejected", "failed"):
-            return _JSONResponse({"success": False, "error": {"code": "RELOAD_FAILED", "message": msg}}, status_code=500)
-        return _JSONResponse({"success": True, "data": {"status": status, "message": msg}})
+        if status == "done":
+            return _JSONResponse({"success": True, "data": {"status": status, "message": msg}})
+        if status == "already_running":
+            return _JSONResponse({"success": True, "data": {"status": status, "message": msg}})
+        if status == "rejected":
+            return _JSONResponse({"success": False, "error": {"code": "VALIDATION_ERROR", "message": msg}}, status_code=400)
+        if status == "disabled":
+            return _JSONResponse({"success": False, "error": {"code": ErrorCode.SEMANTIC_DISABLED.value, "message": msg}}, status_code=409)
+        # failed — surface the underlying error and a 5xx so CI/CD sees a failure
+        return _JSONResponse({"success": False, "error": {"code": _reload_error_code(msg).value, "message": msg}}, status_code=500)
 
     @mcp.custom_route("/mcp/web/example/deployment", methods=["POST"])
     async def api_example_deployment(request: Request) -> Response:
@@ -1072,8 +1237,8 @@ def create_server(
                 status_code=400,
             )
 
-        user = session.get("velodb_user", "") if session else ""
-        password = session.get("velodb_password", "") if session else ""
+        user = session.get("doris_user", "") if session else ""
+        password = session.get("doris_password", "") if session else ""
 
         if _example_job["status"] == "running":
             return _JSONResponse(
@@ -1155,14 +1320,14 @@ def create_server(
             return _JSONResponse({"success": False, "error": {"code": "FORBIDDEN", "message": "Cannot delete built-in example workspace"}}, status_code=403)
         
         # DROP only semantic model tables (active_store + staging_store), NOT data tables
-        from store.store import VeloDBStore
-        await asyncio.to_thread(VeloDBStore.drop_workspace_tables, name)
+        from store.store import DorisStore
+        await asyncio.to_thread(DorisStore.drop_workspace_tables, name)
         # Immediately remove from watcher and clear table cache so it disappears from UI
         multi_watcher._workspaces.pop(name, None)
         multi_watcher.router.rebuild(multi_watcher._workspaces)
-        # Clear the VeloDBStore class-level table cache so re-creation works
-        from store.store import VeloDBStore
-        VeloDBStore._table_cache.pop(name, None)
+        # Clear the DorisStore class-level table cache so re-creation works
+        from store.store import DorisStore
+        DorisStore._table_cache.pop(name, None)
         logger.info(f"Workspace '{name}' deleted by {client_id}")
         return _JSONResponse({"success": True, "data": {"workspace": name, "message": f"Workspace '{name}' deleted"}})
 
@@ -1267,7 +1432,7 @@ def create_server(
 
     _SEMANTIC_LOGIN_HTML = """\
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{SERVER_NAME}} — Login</title><style>
+<title>{{SERVER_NAME}} | Log in</title><style>
   :root { --bg: #f5f5f5; --card: #fff; --text: #333; --muted: #888;
           --link: #1a73e8; --danger: #d93025; --border: #ddd; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1287,14 +1452,14 @@ def create_server(
   .error { background: #fce8e6; color: var(--danger); padding: 10px 14px;
            border-radius: 6px; margin-bottom: 16px; font-size: .85rem; }
 </style></head><body><div class="card"><h1>{{SERVER_NAME}}</h1>
-<p class="sub">Login with your VeloDB credentials</p>{{ERROR}}
-<form method="post"><label>Username</label><input name="user" required autofocus>
+<p class="sub">Log in with your Doris credentials</p>{{ERROR}}
+<form method="post" action="/mcp/web/login"><label>Username</label><input name="user" required autofocus>
 <label>Password</label><input name="password" type="password">
-<button type="submit">Sign in</button></form></div></body></html>"""
+<button type="submit">Log in</button></form></div></body></html>"""
 
     def _render_login(error: str = "") -> str:
         err_html = f'<div class="error">{error}</div>' if error else ""
-        return _SEMANTIC_LOGIN_HTML.replace("{{ERROR}}", err_html).replace("{{SERVER_NAME}}", cfg.mcp.name)
+        return _SEMANTIC_LOGIN_HTML.replace("{{ERROR}}", err_html).replace("{{SERVER_NAME}}", _SEMANTIC_WEB_UI_NAME)
 
     @mcp.custom_route("/mcp/web/login", methods=["GET"])
     async def semantic_webui_login_page(request: Request) -> Response:
@@ -1328,11 +1493,11 @@ def create_server(
         if not user:
             return _HTML(_render_login("Username is required."), status_code=400)
 
-        ok, is_admin = await asyncio.to_thread(_verify_velodb_credentials, user, password)
+        ok, is_admin = await asyncio.to_thread(_verify_doris_credentials, user, password)
         if not ok:
             return _HTML(_render_login(f"Authentication failed for user '{user}'. Check your credentials."), status_code=401)
 
-        # Create session (any authenticated VeloDB user can log in)
+        # Create session (any authenticated Doris user can log in)
         _prune_webui_sessions()
         session_id = _secrets.token_urlsafe(32)
         private_ip = _webui_private_ip(
@@ -1340,14 +1505,14 @@ def create_server(
         )
         session_cookie_value = _encode_webui_session_cookie(session_id, private_ip)
         _webui_sessions[session_id] = {
-            "velodb_user": user,
-            "velodb_password": password,
+            "doris_user": user,
+            "doris_password": password,
             "server_ip": private_ip,
             "created_at": time.time(),
             "is_admin": is_admin,
         }
         logger.info(
-            "WebUI login: user='%s', session=%s..., private_ip=%s",
+            "Semantic Web UI login: user='%s', session=%s..., private_ip=%s",
             user,
             session_id[:8],
             private_ip,
@@ -1386,25 +1551,22 @@ def create_server(
 
     @mcp.custom_route("/mcp/web", methods=["GET"])
     async def semantic_webui_home(request: Request) -> Response:
-        """Home: redirect to first available workspace models page."""
-        from starlette.responses import RedirectResponse as _R
-        client_id, _, err = await _check_semantic_access(request)
+        """Home: render the first available workspace models page directly."""
+        from starlette.responses import HTMLResponse as _HTML
+        client_id, is_admin, err = await _check_semantic_access(request)
         if err:
             return err
         ws = request.query_params.get("workspace", "")
         if not ws:
             ws_names = multi_watcher.workspace_names()
             ws = ws_names[0] if ws_names else "example"
-        return _R(f"/mcp/web/models?workspace={ws}", status_code=303)
+        return _HTML(await _render_models_page(request, client_id, is_admin, ws))
 
-    @mcp.custom_route("/mcp/web/models", methods=["GET"])
-    async def semantic_webui_models(request: Request) -> Response:
-        from starlette.responses import HTMLResponse as _HTML
-        client_id, is_admin, err = await _check_semantic_access(request)
-        if err:
-            return err
-        ws = _get_workspace_from_request(request)
+    async def _render_models_page(
+        request: Request, client_id: str, is_admin: bool, ws: str
+    ) -> str:
         st = await asyncio.to_thread(_get_store, ws)
+        ws_obj = await asyncio.to_thread(multi_watcher.ensure_fresh, ws)
 
         flash = ""
         staged_q = request.query_params.get("staged")
@@ -1475,17 +1637,17 @@ def create_server(
         staging_body += '<div id="ws-result" class="result" style="display:none;margin-top:16px;"></div>'
         
         # Workspace status indicator
-        ws_obj = multi_watcher.get_workspace(ws)
-        if ws_obj and ws_obj.manifest:
+        status_text = ""
+        status_color = "color:var(--muted);"
+        if ws_obj and not ws_obj.enabled:
+            status_text = "disabled"
+        elif ws_obj and ws_obj.is_ready():
             metrics = ws_obj.manifest.list_metrics()
             status_text = f"healthy · {len(metrics)} metrics"
             status_color = "color:#1e8e3e;"
         elif ws_obj and await asyncio.to_thread(ws_obj.store.list_files):
             status_text = "not ready"
             status_color = "color:#e37400;"
-        else:
-            status_text = "no models"
-            status_color = "color:var(--muted);"
         if is_admin:
             from store.seed import is_example_deployed
             example_deployed = await asyncio.to_thread(is_example_deployed)
@@ -1499,16 +1661,43 @@ def create_server(
                     '<button class="btn btn-sm btn-success" '
                     'onclick="exampleAction(true)">🧪 Deploy example</button>'
                 )
+            semantic_enabled = bool(ws_obj and ws_obj.enabled)
+            toggle_label = "Semantic queries: ON" if semantic_enabled else "Semantic queries: OFF"
+            toggle_class = "btn-success" if semantic_enabled else "btn-danger"
+            toggle_html = (
+                f'<button class="btn btn-sm {toggle_class}" '
+                f'onclick="toggleSemantic({str(not semantic_enabled).lower()})">'
+                f'{toggle_label}</button> '
+            )
+            reload_html = (
+                '<button class="btn btn-sm" '
+                'onclick="wsAction(\'/mcp/web/semantic/reload\',\'Reloading\')">⟳ Reload</button> '
+                if semantic_enabled
+                else ""
+            )
             ws_actions_html = (
                 '<span class="btn btn-sm" style="' + status_color + ';cursor:default;">' + status_text + '</span> '
-                '<button class="btn btn-sm" onclick="wsAction(\'/mcp/web/semantic/reload\',\'Reloading\')">⟳ Reload</button>'
+                + toggle_html
+                + reload_html
                 + example_action_html
             )
         else:
-            ws_actions_html = '<span class="btn btn-sm" style="' + status_color + ';cursor:default;">' + status_text + '</span>'
+            enabled_text = "ON" if ws_obj and ws_obj.enabled else "OFF"
+            ws_actions_html = (
+                '<span class="btn btn-sm" style="' + status_color + ';cursor:default;">' + status_text + '</span> '
+                '<span class="btn btn-sm" style="cursor:default;">Semantic queries: ' + enabled_text + '</span>'
+            )
         body = "{{ACTIVE_PANEL}}" + active_body + "{{STAGING_PANEL}}" + staging_body
-        html = _render_page(body, client_id, is_admin, ws, ws_actions_html)
-        return _HTML(html)
+        return _render_page(body, client_id, is_admin, ws, ws_actions_html)
+
+    @mcp.custom_route("/mcp/web/models", methods=["GET"])
+    async def semantic_webui_models(request: Request) -> Response:
+        from starlette.responses import HTMLResponse as _HTML
+        client_id, is_admin, err = await _check_semantic_access(request)
+        if err:
+            return err
+        ws = _get_workspace_from_request(request)
+        return _HTML(await _render_models_page(request, client_id, is_admin, ws))
 
     @mcp.custom_route("/mcp/web/new", methods=["GET"])
     async def semantic_webui_new(request: Request) -> Response:
@@ -1597,6 +1786,24 @@ function fetchJson(url,opts) {
     return r.json();
   });
 }
+function toggleSemantic(enabled) {
+  var ws=new URLSearchParams(window.location.search).get("workspace")||"example";
+  var action=enabled?"enable":"disable";
+  if(!confirm("Are you sure you want to "+action+" semantic queries for workspace '"+ws+"'?")) return;
+  var el=document.getElementById("ws-result");
+  if(el){el.textContent="⏳ Updating semantic query setting...";el.style.display="block";el.style.background="";}
+  fetchJson("/mcp/web/workspace/semantic-enabled",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({workspace:ws,semantic_enabled:enabled})
+  }).then(function(d){
+    if(!d.success){throw new Error(d.error?d.error.message:"Failed");}
+    if(el){el.textContent="✅ "+d.data.message;el.style.background="#e6f4ea";}
+    setTimeout(function(){location.reload();},600);
+  }).catch(function(e){
+    if(el){el.textContent="❌ "+e.message;el.style.background="#fce8e6";}else alert(e.message);
+  });
+}
 function exampleAction(deploy) {
   if (!deploy && !confirm("Delete example models and all four sample data tables?")) return;
   var el=document.getElementById("ws-result");
@@ -1671,7 +1878,7 @@ function wsAction(url,label) {
         delete_ws_btn = f'<button class="btn btn-sm btn-danger" onclick="deleteWorkspace(\'{workspace}\')" style="margin-left:4px;">🗑</button>' if is_admin and workspace != "example" else ""
         body = body.replace("{{WORKSPACE}}", workspace)
         html = _WEBUI_SHELL
-        html = html.replace("{{SERVER_NAME}}", cfg.mcp.name)
+        html = html.replace("{{SERVER_NAME}}", _SEMANTIC_WEB_UI_NAME)
         html = html.replace("{{STYLE}}", _WEBUI_STYLE)
         html = html.replace("{{USER}}", user_display)
         html = html.replace("{{WORKSPACE_SELECTOR}}", ws_selector)
@@ -1894,7 +2101,61 @@ function wsAction(url,label) {
                       params={"workspace": ws}, success=True, duration_ms=0)
         return _JSONResponse({"success": True, "data": {"message": "Staging discarded"}})
 
-    # ---- Semantic toggle via WebUI form ----
+    # ---- Semantic query toggle (Doris admin role required) ----
+
+    @mcp.custom_route("/mcp/web/workspace/semantic-enabled", methods=["POST"])
+    async def api_workspace_semantic_enabled(request: Request) -> Response:
+        client_id, err = await _check_admin_access(request)
+        if err:
+            return err
+        try:
+            body = await request.json()
+        except Exception:
+            return _JSONResponse(
+                {"success": False, "error": {"code": "BAD_REQUEST", "message": "Invalid JSON"}},
+                status_code=400,
+            )
+
+        workspace = (body.get("workspace", "") or "").strip()
+        enabled = body.get("semantic_enabled")
+        if not workspace:
+            return _JSONResponse(
+                {"success": False, "error": {"code": "VALIDATION_ERROR", "message": "workspace is required"}},
+                status_code=400,
+            )
+        if not isinstance(enabled, bool):
+            return _JSONResponse(
+                {"success": False, "error": {"code": "VALIDATION_ERROR", "message": "semantic_enabled must be a boolean"}},
+                status_code=400,
+            )
+        if not multi_watcher.has_workspace(workspace):
+            return _JSONResponse(
+                {"success": False, "error": {"code": "NOT_FOUND", "message": f"Workspace '{workspace}' not found"}},
+                status_code=404,
+            )
+
+        ok, message, details = await asyncio.to_thread(
+            multi_watcher.set_semantic_enabled,
+            workspace,
+            enabled,
+            client_id or "",
+        )
+        log_tool_call(
+            "set_semantic_enabled",
+            client_id=client_id,
+            params={"workspace": workspace, "semantic_enabled": enabled},
+            success=ok,
+            duration_ms=0,
+        )
+        if not ok:
+            return _JSONResponse(
+                {"success": False, "error": {"code": "SERVICE_NOT_READY", "message": message}, "data": details},
+                status_code=500,
+            )
+        return _JSONResponse(
+            {"success": True, "data": {**(details or {}), "message": message}}
+        )
+
     # ---- Semantic Management API (for CLI, MUST be before {filename:path}) ----
 
     @mcp.custom_route("/mcp/web/semantic/files", methods=["GET"])

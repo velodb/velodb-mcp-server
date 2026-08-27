@@ -25,7 +25,7 @@ class ErrorCode(str, Enum):
 
 
 class _Encoder(json.JSONEncoder):
-    """JSON encoder handling VeloDB data types."""
+    """JSON encoder handling Doris data types."""
 
     def default(self, o: Any) -> Any:
         if isinstance(o, Decimal):

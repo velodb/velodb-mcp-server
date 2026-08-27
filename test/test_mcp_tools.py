@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-MCP Tool test cases — covers all 10 Tools
+MCP Tool test cases — covers all 10 tools
 
-Environment:
-  - VeloDB FE 127.0.0.1:9030, admin:admin
+Runtime:
+  - Doris FE 127.0.0.1:9030, admin:admin
   - MCP Server http://localhost:3000/mcp
   - Python 3.10+
 
 Usage:
   python -m pytest test/test_mcp_tools.py -v
-  or directly: python test/test_mcp_tools.py
+  Or run directly: python test/test_mcp_tools.py
 """
 
 import json
@@ -19,7 +19,7 @@ import unittest
 import urllib.request
 import urllib.error
 
-# ── Configuration ────────────────────────────────────
+# ── Configuration ─────────────────────────────────────────
 MCP_URL = os.environ.get("MCP_URL", "http://localhost:3000/mcp")
 AUTH_TOKEN = os.environ.get("MCP_TOKEN", "admin:admin")
 WORKSPACE = os.environ.get("MCP_WORKSPACE", "example")
@@ -30,12 +30,12 @@ HEADERS = {
     "Authorization": f"Bearer {AUTH_TOKEN}",
 }
 
-# Only connection-type exceptions may skip a test; AssertionError must surface
+# Only connection-type errors may skip tests; AssertionError must surface.
 _CONN_ERRORS = (urllib.error.URLError, ConnectionError, TimeoutError)
 
 
 def _call_tool(name: str, arguments: dict) -> dict:
-    """Call an MCP Tool and parse the SSE response"""
+    """Call an MCP tool and parse the SSE response."""
     payload = {
         "jsonrpc": "2.0",
         "id": 1,
@@ -64,7 +64,7 @@ def _call_tool(name: str, arguments: dict) -> dict:
 
 
 def _assert_success(result: dict):
-    """Assert the call succeeded"""
+    """Assert that the tool call succeeded."""
     assert "result" in result, f"Expected 'result' key: {json.dumps(result, ensure_ascii=False)[:500]}"
     assert not result.get("isError"), f"Tool returned error: {json.dumps(result, ensure_ascii=False)[:500]}"
     content = result["result"]["content"][0]["text"]
@@ -78,13 +78,13 @@ def _assert_success(result: dict):
 # ═══════════════════════════════════════════════════════
 
 def test_get_query_guide():
-    """Tool #1: get the workflow guide — mandatory first call"""
+    """Tool #1: get workflow guide — mandatory first step."""
     result = _call_tool("get_query_guide", {})
     assert "result" in result
     text = result["result"]["content"][0]["text"]
     assert len(text) > 100, f"Guide too short: {len(text)} chars"
-    # Should contain key guide content such as semantic-layer usage and tool call order
-    assert any(kw in text.lower() for kw in ["metric", "query", "workspace"]), \
+    # Must contain key guide content, such as metric layer usage and tool order.
+    assert any(kw in text.lower() for kw in ["metric", "semantic", "query", "workspace"]), \
         f"Guide missing key content: {text[:200]}"
     print("  ✅ get_query_guide returned a valid guide")
 
@@ -94,18 +94,18 @@ def test_get_query_guide():
 # ═══════════════════════════════════════════════════════
 
 def test_check_service_health_basic():
-    """Tool #2: basic health check"""
+    """Tool #2: basic health check."""
     data = _assert_success(_call_tool("check_service_health", {}))
-    assert data["data"]["velodb"] == "connected", f"VeloDB not connected: {data}"
+    assert data["data"]["doris"] == "connected", f"Doris not connected: {data}"
     assert "workspaces" in data["data"], "Missing workspaces"
-    print(f"  ✅ VeloDB connected, workspaces: {list(data['data']['workspaces'].keys())}")
+    print(f"  ✅ Doris connected, workspaces: {list(data['data']['workspaces'].keys())}")
 
 
 def test_check_service_health_detail():
-    """Tool #2: detailed health check"""
+    """Tool #2: detailed health check."""
     data = _assert_success(_call_tool("check_service_health", {"detail": True}))
-    assert data["data"]["velodb"] == "connected"
-    print(f"  ✅ Detailed health check passed")
+    assert data["data"]["doris"] == "connected"
+    print("  ✅ Detailed health check passed")
 
 
 # ═══════════════════════════════════════════════════════
@@ -113,7 +113,7 @@ def test_check_service_health_detail():
 # ═══════════════════════════════════════════════════════
 
 def test_list_metrics():
-    """Tool #3: list workspace metrics"""
+    """Tool #3: list workspace metrics."""
     data = _assert_success(
         _call_tool("list_metrics", {"workspace": WORKSPACE})
     )
@@ -122,7 +122,7 @@ def test_list_metrics():
 
 
 def test_list_metrics_pagination():
-    """Tool #3: pagination"""
+    """Tool #3: pagination test."""
     data = _assert_success(
         _call_tool("list_metrics", {"workspace": WORKSPACE, "page_size": 2})
     )
@@ -135,8 +135,8 @@ def test_list_metrics_pagination():
 # ═══════════════════════════════════════════════════════
 
 def test_list_dimensions_for_metric():
-    """Tool #4: list metric dimensions"""
-    # Requires the semantic layer to be ready; skip only when the MCP Server is unreachable (connection-type errors)
+    """Tool #4: list metric dimensions."""
+    # Requires a ready semantic layer; skip only on MCP Server connection errors.
     try:
         data = _assert_success(
             _call_tool("list_dimensions_for_metric", {
@@ -147,8 +147,8 @@ def test_list_dimensions_for_metric():
         assert "data" in data
         print(f"  ✅ total_amount dimensions: {data['data']}")
     except _CONN_ERRORS as e:
-        # Skip only on connection-type errors; assertion failures (e.g. semantic layer not ready) must surface
-        raise unittest.SkipTest(f"Skipping: MCP Server unreachable: {e}")
+        # Only connection errors may skip; semantic readiness assertions must surface.
+        raise unittest.SkipTest(f"Skipped: MCP Server is unreachable: {e}")
 
 
 # ═══════════════════════════════════════════════════════
@@ -156,7 +156,7 @@ def test_list_dimensions_for_metric():
 # ═══════════════════════════════════════════════════════
 
 def test_query_metric_basic():
-    """Tool #5: core — semantic query of a single metric"""
+    """Tool #5: core semantic query for one metric."""
     try:
         data = _assert_success(
             _call_tool("query_metric", {
@@ -167,12 +167,12 @@ def test_query_metric_basic():
         assert "data" in data
         print(f"  ✅ query_metric result: {data['data']}")
     except _CONN_ERRORS as e:
-        # Skip only on connection-type errors; assertion failures (e.g. semantic layer not ready) must surface
-        raise unittest.SkipTest(f"Skipping: MCP Server unreachable: {e}")
+        # Only connection errors may skip; semantic readiness assertions must surface.
+        raise unittest.SkipTest(f"Skipped: MCP Server is unreachable: {e}")
 
 
 def test_query_metric_with_group_by():
-    """Tool #5: semantic query with group_by"""
+    """Tool #5: semantic query with group_by."""
     try:
         data = _assert_success(
             _call_tool("query_metric", {
@@ -182,14 +182,14 @@ def test_query_metric_with_group_by():
             })
         )
         assert "data" in data
-        print(f"  ✅ Multi-metric + group_by query succeeded")
+        print("  ✅ Multi-metric group_by query succeeded")
     except _CONN_ERRORS as e:
-        # Skip only on connection-type errors; assertion failures (e.g. semantic layer not ready) must surface
-        raise unittest.SkipTest(f"Skipping: MCP Server unreachable: {e}")
+        # Only connection errors may skip; semantic readiness assertions must surface.
+        raise unittest.SkipTest(f"Skipped: MCP Server is unreachable: {e}")
 
 
 def test_query_metric_with_where():
-    """Tool #5: semantic query with a where condition"""
+    """Tool #5: semantic query with where."""
     try:
         data = _assert_success(
             _call_tool("query_metric", {
@@ -198,14 +198,14 @@ def test_query_metric_with_where():
                 "where": '{{ Dimension("user__city") }} = \'Beijing\'',
             })
         )
-        print(f"  ✅ Query with where condition succeeded")
+        print("  ✅ Query with where succeeded")
     except _CONN_ERRORS as e:
-        # Skip only on connection-type errors; assertion failures (e.g. semantic layer not ready) must surface
-        raise unittest.SkipTest(f"Skipping: MCP Server unreachable: {e}")
+        # Only connection errors may skip; semantic readiness assertions must surface.
+        raise unittest.SkipTest(f"Skipped: MCP Server is unreachable: {e}")
 
 
 def test_query_metric_with_order_and_limit():
-    """Tool #5: ordering + pagination"""
+    """Tool #5: ordering and pagination."""
     try:
         data = _assert_success(
             _call_tool("query_metric", {
@@ -216,10 +216,10 @@ def test_query_metric_with_order_and_limit():
                 "limit": 3,
             })
         )
-        print(f"  ✅ Order + limit query succeeded")
+        print("  ✅ Order and pagination query succeeded")
     except _CONN_ERRORS as e:
-        # Skip only on connection-type errors; assertion failures (e.g. semantic layer not ready) must surface
-        raise unittest.SkipTest(f"Skipping: MCP Server unreachable: {e}")
+        # Only connection errors may skip; semantic readiness assertions must surface.
+        raise unittest.SkipTest(f"Skipped: MCP Server is unreachable: {e}")
 
 
 # ═══════════════════════════════════════════════════════
@@ -227,7 +227,7 @@ def test_query_metric_with_order_and_limit():
 # ═══════════════════════════════════════════════════════
 
 def test_list_databases():
-    """Tool #6: list all databases"""
+    """Tool #6: list all databases."""
     data = _assert_success(_call_tool("list_databases", {}))
     databases = data["data"]
     assert isinstance(databases, list)
@@ -239,7 +239,7 @@ def test_list_databases():
 
 
 def test_list_databases_pagination():
-    """Tool #6: pagination"""
+    """Tool #6: pagination."""
     data = _assert_success(
         _call_tool("list_databases", {"page_size": 2})
     )
@@ -253,7 +253,7 @@ def test_list_databases_pagination():
 # ═══════════════════════════════════════════════════════
 
 def test_list_tables_mysql():
-    """Tool #7: list tables in the mysql database"""
+    """Tool #7: list tables in mysql."""
     data = _assert_success(
         _call_tool("list_tables", {"database": "mysql"})
     )
@@ -263,7 +263,7 @@ def test_list_tables_mysql():
 
 
 def test_list_tables_dw():
-    """Tool #7: list tables in the dw database"""
+    """Tool #7: list tables in dw."""
     data = _assert_success(
         _call_tool("list_tables", {"database": "dw"})
     )
@@ -275,12 +275,12 @@ def test_list_tables_dw():
 
 
 def test_list_tables_with_like():
-    """Tool #7: fuzzy match"""
+    """Tool #7: LIKE matching."""
     data = _assert_success(
         _call_tool("list_tables", {"database": "mysql", "like": "user%"})
     )
     assert "user" in data["data"]
-    print(f"  ✅ like match OK")
+    print("  ✅ LIKE matching OK")
 
 
 # ═══════════════════════════════════════════════════════
@@ -288,7 +288,7 @@ def test_list_tables_with_like():
 # ═══════════════════════════════════════════════════════
 
 def test_describe_table_summary():
-    """Tool #8: table structure — summary level"""
+    """Tool #8: table schema — summary level."""
     data = _assert_success(
         _call_tool("describe_table", {
             "database": "dw",
@@ -297,11 +297,11 @@ def test_describe_table_summary():
         })
     )
     assert "data" in data
-    print(f"  ✅ dw.orders structure: {data['data']}")
+    print(f"  ✅ dw.orders schema: {data['data']}")
 
 
 def test_describe_table_full():
-    """Tool #8: table structure — full level"""
+    """Tool #8: table schema — full level."""
     data = _assert_success(
         _call_tool("describe_table", {
             "database": "dw",
@@ -310,11 +310,11 @@ def test_describe_table_full():
         })
     )
     assert "data" in data
-    print(f"  ✅ dw.orders full structure")
+    print("  ✅ dw.orders full schema")
 
 
 def test_describe_table_names():
-    """Tool #8: table structure — names level (column names only)"""
+    """Tool #8: table schema — names level (column names only)."""
     data = _assert_success(
         _call_tool("describe_table", {
             "database": "dw",
@@ -323,7 +323,7 @@ def test_describe_table_names():
         })
     )
     assert "data" in data
-    print(f"  ✅ dw.orders column names")
+    print("  ✅ dw.orders column names")
 
 
 # ═══════════════════════════════════════════════════════
@@ -331,24 +331,24 @@ def test_describe_table_names():
 # ═══════════════════════════════════════════════════════
 
 def test_execute_query_select():
-    """Tool #9: raw SQL — basic SELECT"""
+    """Tool #9: raw SQL — basic SELECT."""
     data = _assert_success(
         _call_tool("execute_query", {"sql": "SELECT 1 AS n"})
     )
     assert data["data"]["rows"][0]["n"] == 1
-    print(f"  ✅ SELECT 1 returned correctly")
+    print("  ✅ SELECT 1 returned the expected value")
 
 
 def test_execute_query_version():
-    """Tool #9: raw SQL — VeloDB version"""
+    """Tool #9: raw SQL — Doris version."""
     data = _assert_success(
         _call_tool("execute_query", {"sql": "SELECT VERSION()"})
     )
-    print(f"  ✅ VeloDB version: {data['data']['rows'][0]}")
+    print(f"  ✅ Doris version: {data['data']['rows'][0]}")
 
 
 def test_execute_query_with_database():
-    """Tool #9: raw SQL — specify database"""
+    """Tool #9: raw SQL — explicit database."""
     data = _assert_success(
         _call_tool("execute_query", {
             "sql": "SELECT count(*) AS cnt FROM orders",
@@ -356,11 +356,11 @@ def test_execute_query_with_database():
         })
     )
     assert data["data"]["rows"][0]["cnt"] == 12
-    print(f"  ✅ dw.orders has 12 rows")
+    print("  ✅ dw.orders has 12 rows")
 
 
 def test_execute_query_with_max_rows():
-    """Tool #9: raw SQL — limit returned rows"""
+    """Tool #9: raw SQL — limit returned rows."""
     data = _assert_success(
         _call_tool("execute_query", {
             "sql": "SELECT * FROM dw.dim_date",
@@ -368,31 +368,31 @@ def test_execute_query_with_max_rows():
         })
     )
     assert data["meta"]["row_count"] <= 5
-    print(f"  ✅ max_rows limit in effect, returned {data['meta']['row_count']} rows")
+    print(f"  ✅ max_rows enforced, returned {data['meta']['row_count']} rows")
 
 
 def test_execute_query_show():
-    """Tool #9: raw SQL — SHOW statement"""
+    """Tool #9: raw SQL — SHOW statement."""
     data = _assert_success(
         _call_tool("execute_query", {"sql": "SHOW DATABASES"})
     )
     assert len(data["data"]["rows"]) >= 2
-    print(f"  ✅ SHOW DATABASES succeeded")
+    print("  ✅ SHOW DATABASES succeeded")
 
 
 def test_execute_query_explain():
-    """Tool #9: raw SQL — EXPLAIN statement"""
+    """Tool #9: raw SQL — EXPLAIN statement."""
     data = _assert_success(
         _call_tool("execute_query", {
             "sql": "EXPLAIN SELECT count(*) FROM dw.orders"
         })
     )
     assert "data" in data
-    print(f"  ✅ EXPLAIN succeeded")
+    print("  ✅ EXPLAIN succeeded")
 
 
 def test_execute_query_blocked_write():
-    """Tool #9: read-only validation — INSERT rejected"""
+    """Tool #9: read-only validation — reject INSERT."""
     result = _call_tool("execute_query", {
         "sql": "INSERT INTO dw.orders VALUES (99,1,1,100,'online','done','2024-01-01')"
     })
@@ -400,7 +400,7 @@ def test_execute_query_blocked_write():
            "reject" in str(result).lower() or "not allowed" in str(result).lower() or \
            "forbidden" in str(result).lower() or "only" in str(result).lower(), \
         f"Should block write SQL: {result}"
-    print(f"  ✅ Write operation correctly blocked")
+    print("  ✅ Write operation was blocked correctly")
 
 
 # ═══════════════════════════════════════════════════════
@@ -408,10 +408,10 @@ def test_execute_query_blocked_write():
 # ═══════════════════════════════════════════════════════
 
 def test_reload_semantic_layer():
-    """Tool #10: manually reload the semantic layer"""
+    """Tool #10: manually reload semantic layer."""
     result = _call_tool("reload_semantic_layer", {"workspace": WORKSPACE})
-    # Must return a valid JSON-RPC result whose content is parseable structured JSON
-    # (both success_response / error_response carry a success field)
+    # Must return a valid JSON-RPC result with parseable structured JSON content.
+    # success_response / error_response both include the success field.
     assert "result" in result, f"Expected JSON-RPC result: {json.dumps(result, ensure_ascii=False)[:500]}"
     content = result["result"]["content"][0]["text"]
     data = json.loads(content)
@@ -420,11 +420,11 @@ def test_reload_semantic_layer():
 
 
 # ═══════════════════════════════════════════════════════
-#  Authentication / error handling tests
+#  Auth/error handling tests
 # ═══════════════════════════════════════════════════════
 
 def test_auth_required():
-    """Requests without an Authorization header should be rejected"""
+    """No Authorization header should be rejected."""
     payload = {
         "jsonrpc": "2.0", "id": 1,
         "method": "tools/call",
@@ -446,7 +446,7 @@ def test_auth_required():
 
 
 def test_invalid_token():
-    """Invalid tokens should be rejected"""
+    """Invalid token should be rejected."""
     bad_headers = {**HEADERS, "Authorization": "Bearer fake:fake"}
     payload = {
         "jsonrpc": "2.0", "id": 1,
@@ -465,16 +465,16 @@ def test_invalid_token():
 
 
 def test_execute_query_syntax_error():
-    """SQL syntax errors should return a friendly error"""
+    """SQL syntax errors should return a friendly error."""
     result = _call_tool("execute_query", {"sql": "SELECTT 1"})
-    # May be an error response or success=false
+    # May be an error response or success=false.
     is_error = (
         result.get("isError") or
         ("error" in str(result).lower()) or
         ("syntax" in str(result).lower())
     )
     assert is_error, f"Should report syntax error: {result}"
-    print(f"  ✅ SQL syntax error handled correctly")
+    print("  ✅ SQL syntax error handled correctly")
 
 
 # ═══════════════════════════════════════════════════════
@@ -482,7 +482,7 @@ def test_execute_query_syntax_error():
 # ═══════════════════════════════════════════════════════
 
 def test_agent_workflow():
-    """Simulate the standard AI Agent workflow: guide → health → databases → tables → query"""
+    """Simulate the standard AI Agent workflow: guide → health → databases → tables → query."""
     # Step 1: guide
     r1 = _call_tool("get_query_guide", {})
     assert "result" in r1
@@ -519,7 +519,7 @@ def test_agent_workflow():
     _assert_success(r6)
     print("  Step 6: execute_query ✅")
 
-    print("  🎉 Full Agent workflow passed!")
+    print("  🎉 Complete Agent workflow passed!")
 
 
 # ═══════════════════════════════════════════════════════
@@ -567,7 +567,7 @@ if __name__ == "__main__":
         ("execute_query (block write)", test_execute_query_blocked_write),
         # Tool #10
         ("reload_semantic_layer", test_reload_semantic_layer),
-        # Authentication
+        # Auth
         ("auth required", test_auth_required),
         ("invalid token", test_invalid_token),
         # Error handling
@@ -589,7 +589,7 @@ if __name__ == "__main__":
             print(f"  ❌ FAIL: {e}")
             failed += 1
         except Exception as e:
-            if "skipping" in str(e).lower() or "not_ready" in str(e):
+            if "Skipped" in str(e) or "not_ready" in str(e):
                 print(f"  ⚠️ SKIP: {e}")
                 skipped += 1
             else:

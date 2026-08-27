@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # =============================================================================
-# start-mcp-server.sh — one-click startup for velodb-mcp-server
+# start-mcp-server.sh — start doris-mcp-server
 #
-# All configuration is read from mcp-server.toml in the same directory;
-# no arguments are required.
+# All configuration is read from mcp-server.toml in the same directory.
 # =============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# Prefer the VELODB_MCP_PYTHON environment variable; otherwise use the bundled Python
-PYTHON="${VELODB_MCP_PYTHON:-$SCRIPT_DIR/python/bin/python3}"
+# Prefer DORIS_MCP_PYTHON; otherwise use the bundled Python.
+PYTHON="${DORIS_MCP_PYTHON:-$SCRIPT_DIR/python/bin/python3}"
 CONFIG="$SCRIPT_DIR/mcp-server.toml"
 
 if [ ! -x "$PYTHON" ]; then

@@ -82,7 +82,7 @@ semantic_model:
   metrics:
     - name: revenue_per_user
       type: derived
-      description: Revenue per user
+      description: Spend per user
       expr: total_amount / user_count
 """
 

@@ -2,17 +2,17 @@
 # mcp-server configuration file (TOML)
 # =============================================================================
 # Transport mode: streamable-http only.
-# Configuration values support ${VAR_NAME} environment variable interpolation.
+# Values support ${VAR_NAME} environment-variable interpolation.
 
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
 [server]
-mcp_name = "velodb-mcp-server"        # MCP server name
+mcp_name = "doris-new-mcp"        # MCP service name
 mcp_host = "0.0.0.0"              # HTTP listen address
 mcp_port = 3000                   # HTTP listen port
-fe_port = 9030                    # VeloDB FE MySQL port
-fe_host = "127.0.0.1"             # VeloDB FE address; use the FE private IP or hostname for remote deployments
+fe_port = 9030                    # Doris FE MySQL port
+fe_host = "127.0.0.1"             # Doris FE address; use the private FE IP or hostname for remote deployment
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -27,9 +27,9 @@ rotation_backup_count = 30        # Number of rotated files to keep
 # Query
 # ---------------------------------------------------------------------------
 [query]
-pool_min_size = 0                 # Minimum connection pool size (admin pool + per-user pool)
-pool_max_size = 10                # Maximum connection pool size
-pool_idle_timeout_seconds = 300   # Idle connection reclamation timeout (seconds); used as aiomysql pool_recycle, should be less than VeloDB wait_timeout
-query_timeout_seconds = 600       # SQL query timeout (seconds)
-query_max_rows = 10000            # Maximum rows returned per query
-db_whitelist = []                 # Database allow-list; an empty list means no restriction
+pool_min_size = 0                 # Minimum connection count (admin pool + per-user pool)
+pool_max_size = 10                # Maximum connection count
+pool_idle_timeout_seconds = 300   # Idle connection recycle timeout in seconds; as aiomysql pool_recycle, should be lower than Doris wait_timeout
+query_timeout_seconds = 600       # SQL query timeout in seconds
+query_max_rows = 10000            # Maximum rows returned by one query
+db_whitelist = []                 # Database allow-list; empty means unrestricted

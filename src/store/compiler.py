@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("velodb_mcp_server.semantic")
+logger = logging.getLogger("doris_new_mcp.semantic")
 
 _SENTINEL_NO_JSON = object()
 
@@ -26,7 +26,7 @@ try:
         MetricFlowQueryRequest,
     )
     from metricflow.protocols.sql_client import SqlClient, SqlEngine
-    from metricflow.sql.render.velodb import VeloDBSqlPlanRenderer
+    from metricflow.sql.render.doris import DorisSqlPlanRenderer
     from metricflow.sql.render.sql_plan_renderer import SqlPlanRenderer
     from metricflow.semantics.model.semantic_manifest_lookup import SemanticManifestLookup
     from metricflow.semantics.model.dbt_manifest_parser import parse_manifest_from_dbt_generated_manifest
@@ -35,21 +35,21 @@ except ImportError:
     _ENGINE_AVAILABLE = False
 
 
-class _VeloDBSqlClientStub:
+class _DorisSqlClientStub:
     """Minimal SqlClient stub for compile-only mode.
 
     MetricFlowEngine requires a sql_client to render SQL in the correct dialect.
-    This stub provides sql_engine_type and sql_plan_renderer for VeloDB,
+    This stub provides sql_engine_type and sql_plan_renderer for Doris,
     but raises on any actual query execution.
     """
 
     @property
     def sql_engine_type(self) -> Any:
-        return SqlEngine.VELODB
+        return SqlEngine.DORIS
 
     @property
     def sql_plan_renderer(self) -> Any:
-        return VeloDBSqlPlanRenderer()
+        return DorisSqlPlanRenderer()
 
     def query(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("Compile-only mode: query execution not supported via MetricFlow sql_client")
@@ -75,14 +75,26 @@ class MetricFlowCompiler:
         self._manifest_path = self._project_dir / "target" / "semantic_manifest.json"
         self._engine: Any = None
         self._engine_mode = False
+        self._init_error = ""
 
         if _ENGINE_AVAILABLE:
             self._try_init_engine()
+
+    @property
+    def init_error(self) -> str:
+        """Why the MetricFlow engine failed to initialize ("" if none).
+
+        Surfaced by check_service_health and reload errors so the underlying
+        cause (e.g. a missing agg_time_dimension) reaches the caller instead
+        of a generic 'check model YAML' hint.
+        """
+        return self._init_error
 
     def _try_init_engine(self) -> None:
         """Try to initialize the MetricFlow engine from cached manifest."""
         if not self._manifest_path.exists():
             logger.warning(f"Manifest not found at {self._manifest_path}, engine mode disabled")
+            self._init_error = f"Manifest not found at {self._manifest_path}"
             return
 
         try:
@@ -90,27 +102,31 @@ class MetricFlowCompiler:
                 manifest_json = f.read()
             manifest = parse_manifest_from_dbt_generated_manifest(manifest_json)
             lookup = SemanticManifestLookup(manifest)
-            sql_client = _VeloDBSqlClientStub()
+            sql_client = _DorisSqlClientStub()
 
             self._engine = MetricFlowEngine(
                 semantic_manifest_lookup=lookup,
                 sql_client=sql_client,
             )
             self._engine_mode = True
-            logger.info("MetricFlow engine initialized in compile-only mode (VeloDB dialect)")
+            self._init_error = ""
+            logger.info("MetricFlow engine initialized in compile-only mode (Doris dialect)")
         except Exception as e:
             logger.warning(f"Failed to init MetricFlow engine: {e}")
             self._engine_mode = False
+            self._init_error = str(e)
 
     def replace_with(self, other: "MetricFlowCompiler") -> None:
         """Atomically replace engine state from another compiler instance."""
         self._engine = other._engine
         self._engine_mode = other._engine_mode
+        self._init_error = other._init_error
 
     def reload(self) -> bool:
         """Reload manifest (after dbt parse + validate). Returns True on success."""
         self._engine = None
         self._engine_mode = False
+        self._init_error = ""
         if _ENGINE_AVAILABLE:
             self._try_init_engine()
         return self._engine_mode

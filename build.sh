@@ -1,40 +1,40 @@
 #!/usr/bin/env bash
 # =============================================================================
-# build.sh — build script for velodb-mcp-server / velodb-mcp-client
+# build.sh — doris-mcp-server / doris-mcp-client build script
 #
 #   Build:  ./build.sh linux-x64        # Linux x86_64
 #          ./build.sh linux-arm64      # Linux ARM64
 #          ./build.sh macos-x64        # macOS Intel
 #          ./build.sh macos-arm64      # macOS Apple Silicon
-#          ./build.sh                  # auto-detect the current platform
+#          ./build.sh                  # auto-detect current platform
 #
-#   Each build produces one self-contained all-in-one package (server + client + docs + Python runtime):
-#     dist/velodb-mcp-server-{version}-{platform}.tar.gz
+#   Each build produces one self-contained package (server + client + docs + Python runtime):
+#     dist/doris-mcp-server-{version}-{platform}.tar.gz
 #
 #   Clean:  ./build.sh clean
 # =============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_NAME="velodb-mcp-server"
-# VERSION env var takes precedence; otherwise parsed from pyproject.toml (single source of truth for the version number)
+PROJECT_NAME="doris-mcp-server"
+# VERSION takes precedence; otherwise parse pyproject.toml as the single version source.
 VERSION="${VERSION:-$(grep -m1 '^version' "$SCRIPT_DIR/pyproject.toml" | sed -E 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')}"
 PYTHON_DIR="$SCRIPT_DIR/python"
 REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
 DIST_DIR="$SCRIPT_DIR/dist"
 
-# ── Python Standalone configuration ──────────────────────────────────────
+# ── Python Standalone configuration ───────────────────────────────────────────────
 PY_STANDALONE_RELEASE="${PY_STANDALONE_RELEASE:-20250115}"
 PY_VERSION="${PY_VERSION:-3.10.16}"
 
-# ── Colors ───────────────────────────────────────────────────────────────
+# ── Colors ────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 _info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
 _warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 _error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 
-# ── Platform resolution ──────────────────────────────────────────────────
-# Returns "label|download identifier"  e.g. "linux-x64|x86_64-unknown-linux-gnu"
+# ── Platform resolution ────────────────────────────────────────────────────────────
+# Return "label|download-id", e.g. "linux-x64|x86_64-unknown-linux-gnu".
 _resolve_platform() {
     case "$1" in
         linux-x64)    echo "linux-x64|x86_64-unknown-linux-gnu" ;;
@@ -73,11 +73,10 @@ _pip_platform_tag() {
 }
 
 # ════════════════════════════════════════════════════════════════════
-# _install_deps_cross — cross-install dependencies (does not execute target-platform binaries)
+# _install_deps_cross — cross-install dependencies without running target binaries
 #
-# pip --target merely unpacks wheels into a directory; it does not need to run
-# the target platform's interpreter, so you can build for Linux on macOS and
-# vice versa.
+# pip --target only extracts wheels into a directory and does not need to run
+# the target-platform interpreter, so macOS can build Linux packages and vice versa.
 # ════════════════════════════════════════════════════════════════════
 _install_deps_cross() {
     local platform_label="$1"
@@ -109,10 +108,10 @@ _install_deps_cross() {
 }
 
 # ════════════════════════════════════════════════════════════════════
-# _ensure_python — ensure python/ contains Python 3.10 + all dependencies
+# _ensure_python — ensure python/ contains Python 3.10 and all dependencies
 #
-# Prefers an existing Python (e.g. conda) pointed to by VELODB_MCP_SYSTEM_PYTHON,
-# then falls back to downloading python-build-standalone
+# Prefer an existing Python pointed to by DORIS_MCP_SYSTEM_PYTHON (e.g. conda),
+# then try downloading python-build-standalone.
 # ════════════════════════════════════════════════════════════════════
 _ensure_python() {
     local platform_label="$1"
@@ -146,24 +145,24 @@ _ensure_python() {
 
     # ── Fallback 1: use system/conda Python if provided (native builds only) ──
     if [ "$is_cross" = "false" ] && \
-       [ -n "${VELODB_MCP_SYSTEM_PYTHON:-}" ] && [ -x "$VELODB_MCP_SYSTEM_PYTHON" ]; then
-        _info "Using system Python: $VELODB_MCP_SYSTEM_PYTHON"
+       [ -n "${DORIS_MCP_SYSTEM_PYTHON:-}" ] && [ -x "$DORIS_MCP_SYSTEM_PYTHON" ]; then
+        _info "Using system Python: $DORIS_MCP_SYSTEM_PYTHON"
         local py_ver
-        py_ver=$("$VELODB_MCP_SYSTEM_PYTHON" --version 2>&1)
+        py_ver=$("$DORIS_MCP_SYSTEM_PYTHON" --version 2>&1)
         _info "Python version: $py_ver"
 
-        # The packaging slimming path hardcodes lib/python3.10, so the system Python must be 3.10.x
+        # Packaging and slimming paths hardcode lib/python3.10, so system Python must be 3.10.x.
         local py_major_minor
-        py_major_minor=$("$VELODB_MCP_SYSTEM_PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        py_major_minor=$("$DORIS_MCP_SYSTEM_PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
         if [ "$py_major_minor" != "3.10" ]; then
-            _error "VELODB_MCP_SYSTEM_PYTHON must point to Python 3.10.x (got: $py_ver)"
+            _error "DORIS_MCP_SYSTEM_PYTHON must point to Python 3.10.x (got: $py_ver)"
             _error "The packaging layout hardcodes lib/python3.10; other versions are not supported"
             exit 1
         fi
         
         # Copy real Python files into python/ dir (no symlinks)
         local py_root
-        py_root=$(cd $(dirname $(dirname "$VELODB_MCP_SYSTEM_PYTHON")) && pwd)
+        py_root=$(cd $(dirname $(dirname "$DORIS_MCP_SYSTEM_PYTHON")) && pwd)
         _info "Copying Python from $py_root to $PYTHON_DIR ..."
         rm -rf "$PYTHON_DIR"
         mkdir -p "$PYTHON_DIR"
@@ -201,23 +200,23 @@ _ensure_python() {
     local tarball="$tmp_dir/$tarball_name"
 
     # Allow using a pre-downloaded tarball (useful for slow/unstable networks).
-    if [ -n "${VELODB_MCP_PYTHON_TARBALL:-}" ] && [ -f "$VELODB_MCP_PYTHON_TARBALL" ] && [ -s "$VELODB_MCP_PYTHON_TARBALL" ]; then
-        _info "Using pre-downloaded Python tarball: $VELODB_MCP_PYTHON_TARBALL"
-        cp "$VELODB_MCP_PYTHON_TARBALL" "$tarball"
+    if [ -n "${DORIS_MCP_PYTHON_TARBALL:-}" ] && [ -f "$DORIS_MCP_PYTHON_TARBALL" ] && [ -s "$DORIS_MCP_PYTHON_TARBALL" ]; then
+        _info "Using pre-downloaded Python tarball: $DORIS_MCP_PYTHON_TARBALL"
+        cp "$DORIS_MCP_PYTHON_TARBALL" "$tarball"
     else
         _info "Downloading Python $PY_VERSION for $platform ..."
         if command -v curl > /dev/null 2>&1; then
             curl -fsSL --connect-timeout 30 --max-time 3600 -o "$tarball" "$url" || {
                 _error "Download failed: $url"
-                _error "Tip: set VELODB_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
-                _error "Tip: set VELODB_MCP_PYTHON_TARBALL=/path/to/${tarball_name} to use a pre-downloaded tarball"
+                _error "Tip: set DORIS_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
+                _error "Tip: set DORIS_MCP_PYTHON_TARBALL=/path/to/${tarball_name} to use a pre-downloaded tarball"
                 exit 1
             }
         elif command -v wget > /dev/null 2>&1; then
             wget -q --timeout=30 --tries=3 -O "$tarball" "$url" || {
                 _error "Download failed: $url"
-                _error "Tip: set VELODB_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
-                _error "Tip: set VELODB_MCP_PYTHON_TARBALL=/path/to/${tarball_name} to use a pre-downloaded tarball"
+                _error "Tip: set DORIS_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
+                _error "Tip: set DORIS_MCP_PYTHON_TARBALL=/path/to/${tarball_name} to use a pre-downloaded tarball"
                 exit 1
             }
         else
@@ -228,7 +227,7 @@ _ensure_python() {
 
     if [ ! -f "$tarball" ] || [ ! -s "$tarball" ]; then
         _error "Download failed: $url"
-        _error "Tip: set VELODB_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
+        _error "Tip: set DORIS_MCP_SYSTEM_PYTHON=/path/to/python3.10 to use a local Python"
         exit 1
     fi
 
@@ -263,18 +262,17 @@ _ensure_python() {
 }
 
 # ═════════════════════════════════════════════════════════════════════════
-# _pack — pack a single target
+# _pack — package one target
 # ═════════════════════════════════════════════════════════════════════════
 #
 # Usage: _pack <package-name> <platform> <paths relative to SCRIPT_DIR...>
 #
-# Packs via a staging directory so the extracted top-level directory name ==
-# the package name (e.g. velodb-mcp-server/), matching the ${WORK_DIR}/${name}
-# convention of deployment scripts.
+# Package through a staging directory so the extracted top-level directory name
+# equals the package name (e.g. doris-mcp-server/), matching deployment scripts.
 _pack() {
-    local name="$1"         # velodb-mcp-server
+    local name="$1"         # doris-mcp-server
     local platform="$2"
-    shift 2                 # remaining arguments are paths relative to SCRIPT_DIR
+    shift 2                 # Remaining args are paths relative to SCRIPT_DIR.
     local pkg_platform="${platform//-/_}"   # linux-x64 → linux_x64
     local pkg_name="${name}-${VERSION}-${pkg_platform}"
     local outfile="$DIST_DIR/${pkg_name}.tar.gz"
@@ -286,13 +284,13 @@ _pack() {
     rm -rf "$stage"
     mkdir -p "$root"
 
-    # python/ is common to all packages
+    # python/ is shared by all packages.
     cp -a "$PYTHON_DIR" "$root/python"
     for item in "$@"; do
         cp -a "$SCRIPT_DIR/$item" "$root/"
     done
 
-    # Slimming: remove content that should not ship with the package
+    # Slim package contents by removing files that do not need distribution.
     rm -rf "$root/python/include" "$root/python/share" \
            "$root/python/lib/python3.10/test" \
            "$root/python/lib/python3.10/idlelib" \
@@ -312,11 +310,10 @@ _pack() {
 }
 
 # ═════════════════════════════════════════════════════════════════════════
-# build — build a single all-in-one package (server + client + docs + Python runtime)
+# build — build one full package (server + client + docs + Python runtime)
 #
-# The top-level directory name stays velodb-mcp-server/, matching the
-# ${WORK_DIR}/velodb-mcp-server convention of existing deployment scripts, so
-# deployment scripts need no changes.
+# The top-level directory remains doris-mcp-server/, matching existing
+# deployment scripts and requiring no deployment script changes.
 # ═════════════════════════════════════════════════════════════════════════
 build() {
     local platform_label="${1%%|*}"
@@ -327,7 +324,7 @@ build() {
     # Do not clear all dist/ so packages for multiple platforms can coexist.
     mkdir -p "$DIST_DIR"
 
-    _pack "velodb-mcp-server" "$platform_label" \
+    _pack "doris-mcp-server" "$platform_label" \
         src \
         mcp-server.toml \
         start-mcp-server.sh \
@@ -335,18 +332,18 @@ build() {
         mcp-client.sh \
         README.md \
         INSTALL.html \
-        velodb-mcp-docs.html
+        doris-mcp-docs.html
 
     echo ""
     echo "  ────────────────────────────────────────────"
     echo "  Build complete!  Platform: $platform_label"
     echo ""
-    echo "  tar xzf velodb-mcp-server-${VERSION}-${platform_label//-/_}.tar.gz"
-    echo "  cd velodb-mcp-server"
+    echo "  tar xzf doris-mcp-server-${VERSION}-${platform_label}.tar.gz"
+    echo "  cd doris-mcp-server"
     echo ""
     echo "    Server:  ./start-mcp-server.sh"
     echo "    Client:  ./mcp-client.sh ..."
-    echo "    Docs:    README.md, INSTALL.html, velodb-mcp-docs.html"
+    echo "    Docs:    README.md, INSTALL.html, doris-mcp-docs.html"
     echo ""
     echo "  No network, no pip, no system Python needed."
     echo "  ────────────────────────────────────────────"
@@ -388,7 +385,7 @@ case "${1:-}" in
         echo "  No argument = auto-detect and build"
         echo ""
         echo "  Produces one all-in-one package in dist/:"
-        echo "    velodb-mcp-server-{version}-{platform}.tar.gz"
+        echo "    doris-mcp-server-{version}-{platform}.tar.gz"
         echo "    (server + client + docs + Python runtime)"
         exit 1
         ;;

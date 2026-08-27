@@ -1,0 +1,29 @@
+# LiteLLM Proxy 配置 — SelectDB Doris MCP
+# 启动: HTTPS_PROXY=http://127.0.0.1:8888 litellm --config litellm-config.yaml --port 4000
+#
+# ⚠️ 需要真实 LLM API key 才能做 tool calling 决策。
+#    有 key 后: 在 model_list 里填入 (或设环境变量 OPENAI_API_KEY / DEEPSEEK_API_KEY 等)。
+
+# LLM 模型不需要写死在 config 里，代理运行后用 /model/new 动态新增即可：
+#   curl -X POST http://localhost:4000/model/new \
+#     -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" -H "Content-Type: application/json" \
+#     -d '{"model_name":"gpt-4o-mini","litellm_params":{"model":"openai/gpt-4o-mini","api_key":"<key>"}}'
+#
+# model_list: []
+
+mcp_servers:
+  velodb:
+    transport: http
+    url: https://albj8hpz.cn-beijing.aliyun.selectdb.cloud/mcp
+    auth_type: bearer_token
+    auth_value: os.environ/VELODB_MCP_AUTH_TOKEN
+    static_headers:
+      Accept: application/json, text/event-stream
+
+litellm_settings:
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  store_model_in_db: true   # 允许 /model/new 动态新增模型（存数据库）
+  database_url: os.environ/DATABASE_URL
