@@ -1432,7 +1432,8 @@ def create_server(
 
     _SEMANTIC_LOGIN_HTML = """\
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{SERVER_NAME}} | Log in</title><style>
+<title>{{SERVER_NAME}} | Log in</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cellipse cy='4' rx='7' ry='3' fill='%231a73e8'/%3E%3Cpath d='M2 4v8c0 1.7 2.7 3 6 3s6-1.3 6-3V4' fill='none' stroke='%231a73e8' stroke-width='1.5'/%3E%3Cpath d='M2 8c0 1.7 2.7 3 6 3s6-1.3 6-3' fill='none' stroke='%231a73e8' stroke-width='1.5'/%3E%3C/svg%3E"><style>
   :root { --bg: #f5f5f5; --card: #fff; --text: #333; --muted: #888;
           --link: #1a73e8; --danger: #d93025; --border: #ddd; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1760,7 +1761,8 @@ def create_server(
 """
 
     _WEBUI_SHELL = """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{SERVER_NAME}}</title><style>{{STYLE}}</style></head><body>
+<title>{{SERVER_NAME}}</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cellipse cy='4' rx='7' ry='3' fill='%231a73e8'/%3E%3Cpath d='M2 4v8c0 1.7 2.7 3 6 3s6-1.3 6-3V4' fill='none' stroke='%231a73e8' stroke-width='1.5'/%3E%3Cpath d='M2 8c0 1.7 2.7 3 6 3s6-1.3 6-3' fill='none' stroke='%231a73e8' stroke-width='1.5'/%3E%3C/svg%3E"><style>{{STYLE}}</style></head><body>
 <div class="topbar">
   <a href="/mcp/web" style="font-size:1.2rem;font-weight:700;color:var(--text);text-decoration:none;">📋 {{SERVER_NAME}}</a>
   {{WORKSPACE_SELECTOR}}
