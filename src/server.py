@@ -47,13 +47,14 @@ _ADMIN_USER = "admin"
 _SEMANTIC_WEB_UI_NAME = "Semantic Web UI"
 
 _SERVER_INSTRUCTIONS = (
-    "IMPORTANT: In each conversation context, call get_query_guide() once before "
-    "the first data query. Reuse that guide for every later query in the same "
-    "context; call it again only after a new or reset context. "
-    "Choose semantic metric tools when governed business metrics are relevant, and "
-    "use read-only SQL for explicit SQL, schema exploration, search queries, or when "
-    "no semantic metric matches. Semantic workspaces load only when semantic tools "
-    "or the Semantic Web UI are used."
+    "Choose the query path directly from the user's intent. Use semantic metric tools "
+    "for governed business metrics; use read-only SQL for explicit SQL, schema "
+    "exploration, search, or when no semantic metric matches. Do not call "
+    "get_query_guide or check_service_health as routine preflight steps. Call the "
+    "compact query guide only when routing is unclear. Call service health only after "
+    "a CONNECTION_ERROR or unexplained SERVICE_NOT_READY response, or when the user "
+    "explicitly asks for diagnostics. Semantic workspaces load only when semantic "
+    "tools or the Semantic Web UI are used."
 )
 
 # RFC 1918 private IPv4 networks (excludes loopback, link-local, etc.)
@@ -814,28 +815,43 @@ def create_server(
         "required; DML, DDL, stacked statements, and OUTFILE are blocked."
     )
     _health_description = (
-        "Check Doris connectivity and report semantic workspaces already loaded on "
-        "demand; this check does not initialize the semantic layer."
+        "Diagnostic only; do not call before normal queries. Use after CONNECTION_ERROR "
+        "or unexplained SERVICE_NOT_READY, or when the user asks for service status. "
+        "Checks VeloDB connectivity, discovers semantic workspaces, and refreshes their "
+        "runtime state so the result matches subsequent semantic tool calls."
     )
-    _metric_description = (
-        "Semantic metric tool; loads the requested workspace on demand when governed "
-        "business metrics are relevant."
+    _list_metrics_description = (
+        "Discover governed metrics in a workspace. Call when the matching metric name "
+        "is unknown; skip when it is already known. workspace is required (use the "
+        "user-named workspace, or example only for the bundled sample). Loads on demand; "
+        "no query-guide or health preflight is needed."
+    )
+    _dimensions_description = (
+        "Return valid group_by dimensions for one metric. Call before a grouped query "
+        "when dimensions are unknown; skip when already known. Time-grain shortcuts are "
+        "day, week, month, quarter, and year. Loads the workspace on demand; no health "
+        "preflight is needed."
+    )
+    _query_metric_description = (
+        "Query governed counts, sums, rates, averages, rankings, or trends. metrics uses "
+        "names from list_metrics; group_by uses valid dimensions or day/week/month/quarter/year; "
+        "where accepts a SQL predicate or JSON object; prefix order_by with '-' for DESC; "
+        "having is a plain SQL comparison against metric names. Loads and version-checks "
+        "the workspace itself; no query-guide or health preflight is needed."
+    )
+    _reload_description = (
+        "Manually reload the requested semantic workspace and wait for the result."
     )
 
     @mcp.tool(
         description=(
-            "Return the automatic query-routing and tool workflow guide. Call once "
-            "per conversation context and reuse it for subsequent queries."
+            "Return a compact query-routing reference. Optional: call only when the "
+            "semantic-versus-SQL path or the next recovery action is unclear."
         ),
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def get_query_guide() -> str:
-        """Call once before the first data query in a conversation context.
-
-        Returns the complete workflow guide: health checks, semantic versus raw SQL
-        routing, tool order, search strategies, and query syntax. Reuse the result
-        for later queries in the same context.
-        """
+        """Optional compact routing reference; do not call as a normal preflight."""
         auth = check_tool_access("get_query_guide")
         if auth.denied:
             return auth.denied
@@ -947,7 +963,7 @@ def create_server(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def check_service_health() -> str:
-        """FIRST TOOL to call at the start of any session. Returns doris connectivity and all workspace statuses. Use to determine which workspaces are available."""
+        """Diagnose availability after a connection/readiness failure or on explicit request; never use as a routine preflight."""
         auth = check_tool_access("check_service_health")
         if auth.denied:
             return auth.denied
@@ -971,12 +987,26 @@ def create_server(
         else:
             service_health.get("doris_connection").set_error(f"Connection failed: {db_error}")
 
-        # Refresh only workspaces already loaded on demand. A health check must
-        # not discover or bootstrap the semantic layer merely by being called.
-        for ws_name in multi_watcher.workspace_names():
-            await asyncio.to_thread(multi_watcher.ensure_fresh, ws_name)
+        # A diagnostic result must reflect actual query readiness, not merely
+        # whether this MCP node happens to have loaded a workspace before. This
+        # is intentionally allowed to discover/reload because Health is no
+        # longer part of the normal query preflight.
+        if db_ok:
+            try:
+                from store.store import DorisStore
 
-        # Per-workspace status
+                discovered = await asyncio.to_thread(DorisStore.discover_workspaces)
+                for ws_name in discovered:
+                    if multi_watcher.has_workspace(ws_name):
+                        await asyncio.to_thread(multi_watcher.ensure_fresh, ws_name)
+                    else:
+                        await asyncio.to_thread(
+                            multi_watcher._init_workspace, ws_name, first_load=True
+                        )
+            except Exception:
+                logger.exception("Health diagnostic failed to refresh semantic workspaces")
+
+        # Per-workspace status after the active readiness check.
         ws_statuses: dict[str, dict] = {}
         for ws_name in multi_watcher.workspace_names():
             ws = multi_watcher.get_workspace(ws_name)
@@ -1019,8 +1049,8 @@ def create_server(
                     **version_data,
                 }
             else:
-                files = await asyncio.to_thread(ws.store.list_files)
-                if not files:
+                files = await asyncio.to_thread(ws.store.list_files) if db_ok else []
+                if not files and db_ok:
                     ws_statuses[ws_name] = {
                         "status": "no_models",
                         "message": "No YAML files uploaded",
@@ -1069,7 +1099,7 @@ def create_server(
         return None
 
     @mcp.tool(
-        description=_metric_description,
+        description=_list_metrics_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def list_metrics(workspace: str, page_size: int = 50, page_token: str = "") -> str:
@@ -1088,7 +1118,7 @@ def create_server(
         return result
 
     @mcp.tool(
-        description=_metric_description,
+        description=_dimensions_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def list_dimensions_for_metric(workspace: str, metric_name: str) -> str:
@@ -1107,7 +1137,7 @@ def create_server(
         return result
 
     @mcp.tool(
-        description=_metric_description,
+        description=_query_metric_description,
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=False, openWorldHint=False)
     )
     async def query_metric(
@@ -1121,7 +1151,7 @@ def create_server(
         max_rows: int = 0,
         having: str = "",
     ) -> str:
-        """PRIMARY tool for ALL data queries involving counts, sums, rates, averages, rankings, or trends. Requires workspace with healthy semantic layer (check via check_service_health). Generates semantically correct SQL via MetricFlow. group_by/order_by/where accept bare names (auto-resolved). having filters on aggregated metric values. One query = one call."""
+        """PRIMARY tool for data queries involving counts, sums, rates, averages, rankings, or trends. Loads and checks the requested workspace itself; no health preflight is needed. Generates semantically correct SQL via MetricFlow. group_by/order_by/where accept bare names (auto-resolved). having filters on aggregated metric values. One query = one call."""
         auth = check_tool_access("query_metric")
         if auth.denied:
             return auth.denied
@@ -1153,7 +1183,7 @@ def create_server(
 
     # ========== Manual reload Tool ==========
     @mcp.tool(
-        description=_metric_description,
+        description=_reload_description,
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     )
     async def reload_semantic_layer(workspace: str) -> str:

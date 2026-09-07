@@ -26,7 +26,7 @@ VeloDB MCP Server is a backend service that exposes [VeloDB](https://www.velodb.
 *   **Semantic Metrics Layer**: Define metrics once in YAML (simple / ratio / derived / cumulative / conversion), query them from any MCP client. MetricFlow compiles semantically correct SQL — no hand-written aggregation queries.
 *   **Multi-Workspace Isolation**: Fully isolated tenants with their own models, compiler, and VeloDB storage tables. Models are stored in VeloDB itself (`active` + `staging` tables), so multiple server nodes share state without file sync.
 *   **Staging Workflow**: All model changes go through *staging → validate → commit*; broken models can never affect running queries.
-*   **Guided Tooling**: 10 MCP tools with an enforced workflow (`get_query_guide` → `check_service_health` → semantic query, or metadata discovery → raw SQL fallback).
+*   **Intent-Based Tooling**: Query semantic metrics or read-only SQL directly. A compact query guide is available only when routing is unclear, and service health is reserved for diagnostics after availability failures.
 *   **Credential Pass-Through**: `Authorization: Bearer <velodb-user>:<password>` — every query runs under the caller's own VeloDB identity with per-user connection pools. No shared admin credentials.
 *   **Web UI**: Login with VeloDB credentials to edit/validate/publish models, manage workspaces, and deploy the bundled example — no YAML tooling required.
 *   **CLI Client**: `mcp-client` for calling tools and pushing/pulling model files from scripts and CI/CD.
@@ -120,7 +120,7 @@ claude mcp add --transport http velodb http://<host>:3000/mcp \
 
 A ready-to-copy template is provided at [`mcp.json.example`](mcp.json.example).
 
-**Smoke-test the connection with the FastMCP CLI:**
+**Explicitly diagnose the connection with the FastMCP CLI:**
 
 ```bash
 fastmcp call http://<host>:3000/mcp check_service_health \
@@ -151,14 +151,21 @@ export VELODB_MCP_TOKEN=<user>:<password>
 ## How the Agent Queries Data
 
 ```
-get_query_guide()              ← 1. workflow instructions (always first)
-check_service_health()         ← 2. VeloDB connectivity + workspace status
-    │
-    ├─ semantic layer healthy ─→ list_metrics → list_dimensions_for_metric → query_metric
-    │                             (counts, sums, ratios, rankings, trends)
-    └─ no matching metric ─────→ list_databases → list_tables → describe_table → execute_query
-                                  (raw SQL fallback, read-only validated)
+user intent
+    ├─ governed metric ──→ list_metrics → list_dimensions_for_metric → query_metric
+    └─ explicit SQL, search, or physical schema
+         └─→ list_databases → list_tables → describe_table → execute_query
+
+CONNECTION_ERROR or unexplained SERVICE_NOT_READY
+    └─→ check_service_health     (diagnostic-only active readiness check)
+
+unclear route
+    └─→ get_query_guide          (optional compact reference)
 ```
+
+Known metrics, dimensions, databases, tables, or SQL can skip their corresponding
+discovery calls. Neither `get_query_guide` nor `check_service_health` is a normal
+query preflight.
 
 ## Configuration (`mcp-server.toml`)
 

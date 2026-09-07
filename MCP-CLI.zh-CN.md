@@ -115,7 +115,10 @@ query_metric
 reload_semantic_layer
 ```
 
-### 3.2 检查服务健康状态
+### 3.2 按需诊断服务健康状态
+
+正常查询不需要先调用 Health。仅在数据 Tool 返回 `CONNECTION_ERROR`、无法解释的
+`SERVICE_NOT_READY`，或需要人工查看服务状态时调用：
 
 ```bash
 ./mcp-client.sh tool call check_service_health
@@ -244,7 +247,7 @@ Can not found function 'MATCH_ANY'
 
 ## 6. 语义指标查询
 
-健康检查会返回当前已经加载的工作区。需要语义指标时，再调用相应语义 Tool：
+语义 Tool 会自行按需加载并检查 workspace，无需先做健康检查：
 
 ```bash
 ./mcp-client.sh tool call list_metrics \

@@ -124,8 +124,8 @@ query_max_rows = 10000           # Default maximum rows returned
 
 | # | Tool | Annotations | Purpose |
 |---|------|-------------|---------|
-| 1 | `get_query_guide` | read-only, idempotent | **Mandatory first call.** Returns the full workflow guide telling the AI when to use the semantic layer vs. raw SQL, and the tool call order. |
-| 2 | `check_service_health` | read-only, idempotent | **Mandatory second call.** VeloDB connectivity + per-workspace status + metric counts. |
+| 1 | `get_query_guide` | read-only, idempotent | Optional compact routing reference, used only when the semantic-versus-SQL path is unclear. |
+| 2 | `check_service_health` | read-only, idempotent | Diagnoses VeloDB connectivity and actively verifies workspace readiness after availability failures or on explicit request. |
 | 3 | `list_metrics` | read-only, idempotent | Lists all metrics (name + description) in a workspace. |
 | 4 | `list_dimensions_for_metric` | read-only, idempotent | Returns the available `group_by` dimensions for a metric. |
 | 5 | `query_metric` | read-only | **Core query tool.** MetricFlow compile → execute SQL. Supports `metrics`/`group_by`/`where`/`order_by`/`limit`/`having`/`database`/`max_rows`. |
@@ -137,22 +137,32 @@ query_max_rows = 10000           # Default maximum rows returned
 
 ### 3.2 Agent-side workflow
 
-The system enforces a strict call order on AI clients:
+The AI client chooses a query path directly from user intent, without Guide or
+Health preflight calls:
 
 ```
-get_query_guide()                    ← Step 1: get the workflow guide
-    ↓
-check_service_health()               ← Step 2: check VeloDB and workspace status
-    ↓
-    ├─ Semantic layer healthy? ──→ list_metrics() → list_dimensions_for_metric() → query_metric()
-    │                      (normal path: counts, sums, ratios, rankings, trends)
-    │
-    └─ Semantic layer unavailable or no matching metric?
-        └─→ list_databases() → list_tables() → describe_table() → execute_query()
-            (fallback path: raw SQL + metadata discovery)
+user intent
+    ├─ governed metric ──→ list_metrics() → list_dimensions_for_metric() → query_metric()
+    │                      (skip discovery steps when metric/dimensions are known)
+    └─ explicit SQL, search, or physical schema
+         └─→ list_databases() → list_tables() → describe_table() → execute_query()
+             (skip discovery steps when database/table/schema are known)
+
+CONNECTION_ERROR or unexplained SERVICE_NOT_READY
+    └─→ check_service_health()       ← diagnostic-only active readiness check
+
+route still unclear
+    └─→ get_query_guide()            ← optional compact reference
 ```
 
 **Key rule:** when the semantic layer is healthy and a matching metric exists, bypassing `query_metric` in favor of `execute_query` is never allowed.
+
+`check_service_health` runs VeloDB `SELECT 1`, discovers workspaces, and refreshes
+their semantic runtime state. This makes its result agree with `list_metrics` even
+on a fresh or different MCP node. The extra work is acceptable because Health is
+not a normal preflight. Explicit authentication, permission, SQL, parameter,
+missing metric, timeout, and disabled-semantic errors are handled directly without
+an additional Health call.
 
 ### 3.3 Tool implementation pattern
 

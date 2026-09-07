@@ -1,7 +1,7 @@
 """Service health state tracking.
 
-Central registry for component health status. Updated by watcher on hot-reload
-success/failure. Queryable via check_service_health Tool and /health endpoint.
+Central registry for component health status. Updated by runtime operations and
+queried on demand by the diagnostic ``check_service_health`` tool.
 """
 
 from __future__ import annotations

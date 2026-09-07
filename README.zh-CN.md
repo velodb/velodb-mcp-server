@@ -28,7 +28,7 @@ Doris MCP Server 是一个基于 [Model Context Protocol (MCP)](https://modelcon
 *   **语义指标层**：YAML 中一次定义指标（简单 / 比率 / 衍生 / 累计 / 漏斗转化），任意 MCP 客户端均可查询。MetricFlow 编译语义正确的 SQL，无需手写聚合查询。
 *   **多工作区隔离**：完全隔离的逻辑租户，各自拥有独立的模型、编译器和 Doris 存储表。模型存储在 Doris 内（active + staging 两张表），多节点共享状态无需文件同步。
 *   **Staging 工作流**：所有模型变更必经 *staging → validate → commit*，错误模型永远不会影响线上查询。
-*   **引导式工具链**：10 个 MCP Tool，强制执行工作流（`get_query_guide` → `check_service_health` → 语义查询，或元数据发现 → 裸 SQL 兜底）。
+*   **意图驱动工具链**：直接选择语义指标或只读 SQL；仅在路由不明确时获取精简指南，连接或服务可用性失败后再调用健康诊断。
 *   **凭据透传**：`Authorization: Bearer <doris用户>:<密码>`——每条 SQL 都以调用者自己的 Doris 身份执行，每用户独立连接池，无共享 admin 凭据。
 *   **Semantic Web UI**：使用 Doris 凭据登录，在线编辑、验证和发布模型，管理工作区并一键部署示例，无需本地 YAML 工具链。
 *   **CLI 客户端**：`mcp-client` 支持脚本和 CI/CD 中调用工具、推拉模型文件。
@@ -101,7 +101,7 @@ claude mcp add --transport http doris http://<host>:3000/mcp \
 
 可直接复制的模板见 [`mcp.json.example`](mcp.json.example)。
 
-**用 FastMCP CLI 冒烟测试：**
+**用 FastMCP CLI 显式诊断连接：**
 
 ```bash
 fastmcp call http://<host>:3000/mcp check_service_health \

@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 import sys
+import inspect
 from pathlib import Path
 
 _SRC = Path(__file__).resolve().parent.parent / "src"
@@ -30,10 +31,12 @@ class TestSemanticInstructions(unittest.TestCase):
         self.assertIn("read-only SQL", _SERVER_INSTRUCTIONS)
         self.assertNotIn("query mode", _SERVER_INSTRUCTIONS.lower())
 
-    def test_query_guide_is_requested_once_per_conversation(self):
-        self.assertIn("once before the first data query", _SERVER_INSTRUCTIONS)
-        self.assertIn("Reuse that guide", _SERVER_INSTRUCTIONS)
-        self.assertNotIn("Before any data query", _SERVER_INSTRUCTIONS)
+    def test_guide_and_health_are_not_query_preflight(self):
+        self.assertIn(
+            "Do not call get_query_guide or check_service_health as routine preflight",
+            _SERVER_INSTRUCTIONS,
+        )
+        self.assertIn("CONNECTION_ERROR", _SERVER_INSTRUCTIONS)
 
 
 class TestSemanticToolDescriptions(unittest.IsolatedAsyncioTestCase):
@@ -50,22 +53,45 @@ class TestSemanticToolDescriptions(unittest.IsolatedAsyncioTestCase):
         server = self._server()
         execute_query = await server.get_tool("execute_query")
         list_metrics = await server.get_tool("list_metrics")
+        list_dimensions = await server.get_tool("list_dimensions_for_metric")
+        query_metric = await server.get_tool("query_metric")
         check_health = await server.get_tool("check_service_health")
 
         self.assertIn("loading is not required", execute_query.description)
-        self.assertIn("on demand", list_metrics.description)
-        self.assertIn("does not initialize", check_health.description)
+        self.assertIn("skip when it is already known", list_metrics.description)
+        self.assertIn("Time-grain shortcuts", list_dimensions.description)
+        self.assertIn("prefix order_by with '-' for DESC", query_metric.description)
+        self.assertIn("where accepts a SQL predicate or JSON object", query_metric.description)
+        self.assertIn("having is a plain SQL comparison", query_metric.description)
+        self.assertIn("no query-guide or health preflight", query_metric.description)
+        self.assertIn("Diagnostic only", check_health.description)
+        self.assertIn("do not call before normal queries", check_health.description)
+
+    async def test_health_actively_checks_semantic_workspaces(self):
+        server = self._server()
+        check_health = await server.get_tool("check_service_health")
+
+        source = inspect.getsource(check_health.fn)
+        self.assertIn("discover_workspaces", source)
+        self.assertIn("ensure_fresh", source)
+        self.assertIn("first_load=True", source)
 
     async def test_server_auth_does_not_eagerly_initialize_semantics(self):
         server = self._server()
         self.assertFalse(hasattr(server.auth, "_on_authenticated"))
 
-    async def test_query_guide_tool_is_described_as_once_per_context(self):
+    async def test_query_guide_is_optional_and_compact(self):
         server = self._server()
         query_guide = await server.get_tool("get_query_guide")
 
-        self.assertIn("once per conversation context", query_guide.description)
-        self.assertIn("Call once before the first data query", query_guide.fn.__doc__)
+        self.assertIn("Optional", query_guide.description)
+        self.assertIn("do not call as a normal preflight", query_guide.fn.__doc__)
+
+        guide_path = _SRC / "skills" / "doris-mcp-skill.md"
+        guide = guide_path.read_text(encoding="utf-8")
+        self.assertLess(len(guide), 4_000)
+        self.assertIn("Do not call", guide)
+        self.assertIn("CONNECTION_ERROR", guide)
 
 
 if __name__ == "__main__":

@@ -78,7 +78,7 @@ def _assert_success(result: dict):
 # ═══════════════════════════════════════════════════════
 
 def test_get_query_guide():
-    """Tool #1: get workflow guide — mandatory first step."""
+    """Tool #1: optional compact workflow guide."""
     result = _call_tool("get_query_guide", {})
     assert "result" in result
     text = result["result"]["content"][0]["text"]
@@ -482,42 +482,32 @@ def test_execute_query_syntax_error():
 # ═══════════════════════════════════════════════════════
 
 def test_agent_workflow():
-    """Simulate the standard AI Agent workflow: guide → health → databases → tables → query."""
-    # Step 1: guide
-    r1 = _call_tool("get_query_guide", {})
-    assert "result" in r1
-    print("  Step 1: get_query_guide ✅")
+    """Simulate the normal direct workflow without guide or health preflight."""
+    # Step 1: list databases
+    r1 = _call_tool("list_databases", {})
+    d1 = _assert_success(r1)
+    assert "dw" in d1["data"]
+    print("  Step 1: list_databases ✅")
 
-    # Step 2: health
-    r2 = _call_tool("check_service_health", {})
-    assert "result" in r2
-    print("  Step 2: check_service_health ✅")
+    # Step 2: list tables
+    r2 = _call_tool("list_tables", {"database": "dw"})
+    d2 = _assert_success(r2)
+    assert "orders" in d2["data"]
+    print("  Step 2: list_tables ✅")
 
-    # Step 3: list databases
-    r3 = _call_tool("list_databases", {})
-    d3 = _assert_success(r3)
-    assert "dw" in d3["data"]
-    print("  Step 3: list_databases ✅")
-
-    # Step 4: list tables
-    r4 = _call_tool("list_tables", {"database": "dw"})
-    d4 = _assert_success(r4)
-    assert "orders" in d4["data"]
-    print("  Step 4: list_tables ✅")
-
-    # Step 5: describe
-    r5 = _call_tool("describe_table", {
+    # Step 3: describe
+    r3 = _call_tool("describe_table", {
         "database": "dw", "table": "orders", "detail_level": "summary"
     })
-    _assert_success(r5)
-    print("  Step 5: describe_table ✅")
+    _assert_success(r3)
+    print("  Step 3: describe_table ✅")
 
-    # Step 6: query
-    r6 = _call_tool("execute_query", {
+    # Step 4: query
+    r4 = _call_tool("execute_query", {
         "sql": "SELECT channel, count(*) AS c FROM dw.orders GROUP BY channel"
     })
-    _assert_success(r6)
-    print("  Step 6: execute_query ✅")
+    _assert_success(r4)
+    print("  Step 4: execute_query ✅")
 
     print("  🎉 Complete Agent workflow passed!")
 

@@ -136,6 +136,9 @@ Semantic-layer readiness assertion failures are counted as FAIL.
 ### End-to-End Test (Agent Workflow)
 
 ```
-get_query_guide → check_service_health → list_databases
-  → list_tables → describe_table → execute_query
+list_databases → list_tables → describe_table → execute_query
 ```
+
+`get_query_guide` is an optional compact routing reference.
+`check_service_health` is tested separately as a diagnostic tool and is not a
+normal query preflight.
