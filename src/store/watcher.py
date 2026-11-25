@@ -762,12 +762,34 @@ class MultiWorkspaceWatcher:
         return True, f"Committed (semantic version: {state_version}); {reload_note}"
 
     def grant_workspace_access(self, workspace: str) -> int:
-        """Grant all users access to every physical table in one workspace."""
+        """Grant the access semantic queries need for one workspace.
+
+        Every user gets SELECT on the ``system_mcp`` model store. Physical
+        data tables are granted to every user only when
+        ``semantic.grant_tables_to_all_users`` is enabled; otherwise each
+        query is limited by the caller's own Doris grants.
+
+        Returns the number of physical tables granted.
+        """
         ws = self._workspaces.get(workspace)
         if not ws:
             raise ValueError(f"Workspace not found: {workspace}")
 
-        from store.bootstrap import collect_physical_tables, grant_select_on_physical_tables
+        from store.bootstrap import (
+            collect_physical_tables,
+            grant_select_on_physical_tables,
+            grant_select_on_semantic_store,
+        )
+
+        grant_select_on_semantic_store()
+
+        app_config = getattr(self, "_app_config", None)
+        if not getattr(app_config, "semantic_grant_tables_to_all_users", False):
+            logger.info(
+                f"[{workspace}] Physical tables not granted; "
+                "queries use the caller's own Doris grants"
+            )
+            return 0
 
         tables = collect_physical_tables(ws.models_dir)
         grant_select_on_physical_tables(tables)

@@ -148,6 +148,7 @@ Semantic Web UI 属于显式的语义层操作，会初始化当前 workspace �
 | `query.db_whitelist` | `[]` | 可选的库白名单 |
 | `query.query_timeout_seconds` | `600` | SQL 查询超时 |
 | `query.query_max_rows` | `10000` | 单次查询最大返回行数 |
+| `semantic.grant_tables_to_all_users` | `false` | 提交时将工作区物理表的 SELECT 权限授予所有 Doris 用户（`'%'`）。保持关闭时，语义查询遵循调用者自身的 Doris 权限 |
 
 所有配置值支持 `${ENV_VAR}` 环境变量插值。
 

@@ -179,7 +179,7 @@ class TestValidateStagingDependencies(unittest.TestCase):
 
 
 class TestWorkspaceSemanticGrants(unittest.TestCase):
-    def test_commit_grants_every_table_for_a_new_workspace(self):
+    def _commit(self, app_config):
         from store.watcher import MultiWorkspaceWatcher
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -199,17 +199,45 @@ semantic_model:
             store.staging_commit.return_value.revision = "abc123"
             store.staging_list.return_value = []
             watcher = MultiWorkspaceWatcher.__new__(MultiWorkspaceWatcher)
+            watcher._app_config = app_config
             watcher._workspaces = {
                 "sales": SimpleNamespace(store=store, models_dir=models_dir)
             }
             watcher._staging_validated = {"sales"}
             watcher.force_reload = MagicMock(return_value=("done", "Reload completed"))
 
-            with patch("store.bootstrap.grant_select_on_physical_tables") as grant:
+            with (
+                patch("store.bootstrap.grant_select_on_semantic_store") as store_grant,
+                patch("store.bootstrap.grant_select_on_physical_tables") as table_grant,
+            ):
                 ok, _ = watcher.commit_staging("sales")
 
-            self.assertTrue(ok)
-            grant.assert_called_once_with({"sales.orders", "sales.users"})
+        return ok, store_grant, table_grant
+
+    def test_commit_does_not_grant_physical_tables_to_all_users_by_default(self):
+        ok, store_grant, table_grant = self._commit(
+            SimpleNamespace(semantic_grant_tables_to_all_users=False)
+        )
+
+        self.assertTrue(ok)
+        store_grant.assert_called_once_with()
+        table_grant.assert_not_called()
+
+    def test_commit_without_app_config_does_not_grant_physical_tables(self):
+        ok, store_grant, table_grant = self._commit(None)
+
+        self.assertTrue(ok)
+        store_grant.assert_called_once_with()
+        table_grant.assert_not_called()
+
+    def test_commit_grants_every_table_when_open_workspace_mode_is_enabled(self):
+        ok, store_grant, table_grant = self._commit(
+            SimpleNamespace(semantic_grant_tables_to_all_users=True)
+        )
+
+        self.assertTrue(ok)
+        store_grant.assert_called_once_with()
+        table_grant.assert_called_once_with({"sales.orders", "sales.users"})
 
 
 class TestWorkspaceSemanticEnabled(unittest.TestCase):

@@ -14,6 +14,19 @@ from dotenv import load_dotenv
 _ENV_PATTERN = re.compile(r"\$\{(\w+)\}")
 
 
+def _parse_bool(value: Any, key: str) -> bool:
+    """Parse a TOML/YAML boolean, accepting strings from ${VAR} interpolation."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("true", "1", "yes", "on"):
+            return True
+        if lowered in ("false", "0", "no", "off", ""):
+            return False
+    raise ValueError(f"Invalid boolean for {key}: {value!r}")
+
+
 def _interpolate_env(value: Any) -> Any:
     if isinstance(value, str):
         def _replace(m: re.Match) -> str:
@@ -91,4 +104,13 @@ class AppConfig:
         self.mcp = McpConfig(data)
         self.cluster = ClusterConfig(data.get("server", {}), data.get("query", {}) or {})
         self.active_store = data.get("active_store", {}) or {}
+        semantic = data.get("semantic", {}) or {}
+        # Opt-in "open workspace" mode: on commit, grant every Doris user
+        # SELECT on the physical tables that the semantic models reference.
+        # Off by default, so queries only reach data the caller's own Doris
+        # grants allow.
+        self.semantic_grant_tables_to_all_users: bool = _parse_bool(
+            semantic.get("grant_tables_to_all_users", False),
+            "semantic.grant_tables_to_all_users",
+        )
         self.auth = None

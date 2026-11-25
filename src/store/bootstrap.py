@@ -351,8 +351,28 @@ def collect_physical_tables(models_dir: Path) -> set[str]:
     return tables
 
 
+def grant_select_on_semantic_store() -> None:
+    """Grant all Doris users SELECT on the ``system_mcp`` model store.
+
+    Every semantic tool call reads model definitions from ``system_mcp`` with
+    the caller's own credentials, so users need read access to it. It holds
+    model YAML only, not source data.
+    """
+    from store.store import _get_conn
+
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("GRANT SELECT_PRIV ON `system_mcp`.* TO '%'")
+    finally:
+        conn.close()
+
+
 def grant_select_on_physical_tables(tables: set[str]) -> None:
-    """Grant all Doris users SELECT only on the supplied physical tables."""
+    """Grant all Doris users SELECT on the supplied physical tables.
+
+    Only used when ``semantic.grant_tables_to_all_users`` is enabled.
+    """
     quoted_tables = []
     for table in sorted(tables):
         parts = table.split(".")
@@ -369,7 +389,6 @@ def grant_select_on_physical_tables(tables: set[str]) -> None:
     conn = _get_conn()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("GRANT SELECT_PRIV ON `system_mcp`.* TO '%'")
             for table in quoted_tables:
                 cursor.execute(f"GRANT SELECT_PRIV ON {table} TO '%'")
     finally:

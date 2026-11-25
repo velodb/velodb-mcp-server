@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 _SRC = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC) not in sys.path:
@@ -22,6 +24,45 @@ class TestSemanticConfiguration(unittest.TestCase):
             config = AppConfig(config_dir)
 
         self.assertFalse(hasattr(config, "semantic"))
+
+    def test_physical_table_grants_to_all_users_are_off_by_default(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config = AppConfig(Path(temporary))
+
+        self.assertFalse(config.semantic_grant_tables_to_all_users)
+
+    def test_physical_table_grants_to_all_users_can_be_enabled(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config_dir = Path(temporary)
+            (config_dir / "mcp-server.toml").write_text(
+                "[semantic]\ngrant_tables_to_all_users = true\n",
+                encoding="utf-8",
+            )
+            config = AppConfig(config_dir)
+
+        self.assertTrue(config.semantic_grant_tables_to_all_users)
+
+    def test_interpolated_false_string_keeps_physical_table_grants_off(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config_dir = Path(temporary)
+            (config_dir / "mcp-server.toml").write_text(
+                '[semantic]\ngrant_tables_to_all_users = "${MCP_TEST_OPEN_WORKSPACE}"\n',
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {"MCP_TEST_OPEN_WORKSPACE": "false"}):
+                config = AppConfig(config_dir)
+
+        self.assertFalse(config.semantic_grant_tables_to_all_users)
+
+    def test_unrecognized_value_for_physical_table_grants_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config_dir = Path(temporary)
+            (config_dir / "mcp-server.toml").write_text(
+                '[semantic]\ngrant_tables_to_all_users = "sometimes"\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "semantic.grant_tables_to_all_users"):
+                AppConfig(config_dir)
 
 
 class TestSemanticInstructions(unittest.TestCase):

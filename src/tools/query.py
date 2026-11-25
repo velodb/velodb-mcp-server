@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 from core.connection import ConnectionPool
-from core.response import ErrorCode, error_response, success_response
+from core.response import ErrorCode, db_error_response, error_response, success_response
 from core.sql_validator import validate_readonly
 
 
@@ -37,4 +37,8 @@ async def execute_query(
     except TimeoutError:
         return error_response(ErrorCode.QUERY_TIMEOUT, "Query timed out")
     except Exception as e:
-        return error_response(ErrorCode.CONNECTION_ERROR, str(e))
+        return db_error_response(
+            e,
+            "Your Doris user lacks a privilege this query needs. "
+            "Ask a Doris admin to grant SELECT on the tables it reads; retrying will not help.",
+        )

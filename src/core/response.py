@@ -60,3 +60,49 @@ def error_response(
     if details:
         err["details"] = details
     return json.dumps({"success": False, "error": err}, cls=_Encoder, ensure_ascii=False)
+
+
+# MySQL-protocol error codes Doris returns when the user is authenticated but
+# lacks a privilege: database (1044), table (1142), column (1143) and
+# operation-level (1227) access denials. 1045 is a failed login and stays a
+# connection error.
+_ACCESS_DENIED_CODES = frozenset({1044, 1142, 1143, 1227})
+_LOGIN_FAILED_CODE = 1045
+
+
+def is_access_denied_error(exc: BaseException) -> bool:
+    """Return True when a Doris error means the caller lacks a privilege."""
+    code = exc.args[0] if exc.args and isinstance(exc.args[0], int) else None
+    if code == _LOGIN_FAILED_CODE:
+        return False
+    if code in _ACCESS_DENIED_CODES:
+        return True
+    # Doris also reports some privilege failures under generic codes (e.g. 1105):
+    # "Access denied ..." or, from column/Ranger authorization,
+    # "Permission denied: user [...] does not have privilege ...". A plain
+    # "Permission denied" can be a storage or filesystem error, so it does not
+    # count. A failed login says "using password" and is not a privilege
+    # problem, even when it arrives wrapped without its 1045 code.
+    message = str(exc).lower()
+    if "using password" in message:
+        return False
+    return (
+        "access denied" in message
+        or "does not have privilege" in message
+        or "permission denied: user" in message
+    )
+
+
+def db_error_response(exc: BaseException, permission_hint: str) -> str:
+    """Build an error response for a failed Doris call.
+
+    Privilege failures become PERMISSION_DENIED with *permission_hint* so the
+    caller knows to request a grant instead of retrying. Anything else stays
+    CONNECTION_ERROR.
+    """
+    if is_access_denied_error(exc):
+        return error_response(
+            ErrorCode.PERMISSION_DENIED,
+            f"{permission_hint} Doris error: {exc}",
+        )
+    return error_response(ErrorCode.CONNECTION_ERROR, str(exc))

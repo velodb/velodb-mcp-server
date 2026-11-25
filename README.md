@@ -169,6 +169,7 @@ check_service_health()         ← 2. VeloDB connectivity + workspace status
 | `query.db_whitelist` | `[]` | Optional database allow-list |
 | `query.query_timeout_seconds` | `600` | SQL query timeout |
 | `query.query_max_rows` | `10000` | Max rows per query |
+| `semantic.grant_tables_to_all_users` | `false` | On commit, grant SELECT on each workspace's physical tables to every Doris user (`'%'`). Leave off so semantic queries follow each caller's own Doris grants |
 
 All values support `${ENV_VAR}` interpolation.
 

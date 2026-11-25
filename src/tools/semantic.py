@@ -7,7 +7,7 @@ from typing import Any
 
 from core.connection import ConnectionPool
 from core.pagination import paginate
-from core.response import ErrorCode, error_response, success_response
+from core.response import ErrorCode, db_error_response, error_response, success_response
 from core.sql_validator import validate_readonly
 from store.compiler import MetricFlowCompiler
 from store.manifest import SemanticManifest
@@ -56,6 +56,7 @@ async def query_metric(
     database: str | None = None,
     max_rows: int | None = None,
     having: str | None = None,
+    workspace: str | None = None,
 ) -> str:
     """Compile a metric query via MetricFlow, then execute the SQL."""
     try:
@@ -108,6 +109,11 @@ async def query_metric(
     except ValueError as e:
         return error_response(ErrorCode.INVALID_PARAMS, str(e))
     except Exception as e:
-        return error_response(ErrorCode.CONNECTION_ERROR, str(e))
+        scope = f"workspace '{workspace}'" if workspace else "these metrics"
+        return db_error_response(
+            e,
+            f"Your Doris user cannot read the tables behind {scope}. "
+            "Ask a Doris admin to grant SELECT on them; retrying will not help.",
+        )
 
 

@@ -13,6 +13,7 @@ if str(_SRC) not in sys.path:
 from store.bootstrap import (  # noqa: E402
     collect_physical_tables,
     grant_select_on_physical_tables,
+    grant_select_on_semantic_store,
 )
 
 
@@ -63,12 +64,23 @@ project_configuration:
         self.assertEqual(
             statements,
             [
-                "GRANT SELECT_PRIV ON `system_mcp`.* TO '%'",
                 "GRANT SELECT_PRIV ON `dw`.`orders` TO '%'",
                 "GRANT SELECT_PRIV ON `dw`.`users` TO '%'",
             ],
         )
         self.assertTrue(all("*.*" not in statement for statement in statements))
+
+    def test_semantic_store_grant_only_covers_system_mcp(self) -> None:
+        cursor = MagicMock()
+        conn = MagicMock()
+        conn.cursor.return_value.__enter__.return_value = cursor
+
+        with patch("store.store._get_conn", return_value=conn):
+            grant_select_on_semantic_store()
+
+        statements = [call.args[0] for call in cursor.execute.call_args_list]
+        self.assertEqual(statements, ["GRANT SELECT_PRIV ON `system_mcp`.* TO '%'"])
+        conn.close.assert_called_once_with()
 
     def test_rejects_invalid_table_before_granting(self) -> None:
         with (

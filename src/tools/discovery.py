@@ -6,7 +6,7 @@ from typing import Any
 
 from core.connection import ConnectionPool
 from core.pagination import paginate
-from core.response import ErrorCode, error_response, success_response
+from core.response import db_error_response, success_response
 
 
 async def list_databases(
@@ -34,7 +34,10 @@ async def list_databases(
             meta["next_page_token"] = next_token
         return success_response(page, meta)
     except Exception as e:
-        return error_response(ErrorCode.CONNECTION_ERROR, str(e))
+        return db_error_response(
+            e,
+            "Your Doris user lacks a privilege needed to list databases. Ask a Doris admin for access.",
+        )
 
 
 async def list_tables(
@@ -59,7 +62,10 @@ async def list_tables(
             meta["next_page_token"] = next_token
         return success_response(page, meta)
     except Exception as e:
-        return error_response(ErrorCode.CONNECTION_ERROR, str(e))
+        return db_error_response(
+            e,
+            "Your Doris user lacks a privilege on this database. Ask a Doris admin to grant access to it.",
+        )
 
 
 async def describe_table(
@@ -115,4 +121,7 @@ async def describe_table(
         meta = {"database": database, "table": table}
         return success_response(result, meta)
     except Exception as e:
-        return error_response(ErrorCode.CONNECTION_ERROR, str(e))
+        return db_error_response(
+            e,
+            "Your Doris user lacks a privilege on this table. Ask a Doris admin to grant SELECT on it.",
+        )

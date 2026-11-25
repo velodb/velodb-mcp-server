@@ -1141,7 +1141,7 @@ def create_server(
             return pool
 
         from tools.semantic import query_metric as _query_metric
-        result = await _query_metric(ws.compiler, pool, metrics, group_by or None, where or None, order_by or None, limit or None, database or None, max_rows or None, having or None)
+        result = await _query_metric(ws.compiler, pool, metrics, group_by or None, where or None, order_by or None, limit or None, database or None, max_rows or None, having or None, workspace=workspace)
         duration = (time.monotonic() - start) * 1000
         success = '"success": true' in result
         mf_cmd = f"mf query --metrics {','.join(metrics)}"
