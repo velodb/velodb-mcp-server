@@ -670,7 +670,9 @@ class MultiWorkspaceWatcher:
                 return False, f"Physical validation failed: {err}", {"phase": "physical"}
 
             tmp_ws = Path(tempfile.mkdtemp(prefix=f"stg_ws_{workspace}_"))
-            ok, err = bootstrap(self._config_dir, tmp_ws, models_dir=tmp_models)
+            ok, err = bootstrap(
+                self._config_dir, tmp_ws, models_dir=tmp_models, check_entities=True
+            )
             if not ok:
                 shutil.rmtree(str(tmp_models), ignore_errors=True)
                 shutil.rmtree(str(tmp_ws), ignore_errors=True)

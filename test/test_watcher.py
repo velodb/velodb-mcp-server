@@ -177,6 +177,33 @@ class TestValidateStagingDependencies(unittest.TestCase):
         self.assertIn("revenue.yaml", " ".join(details["errors"]))
         self.assertIn("total_amount", message)
 
+    def test_staging_validate_turns_on_entity_checks(self):
+        from store.watcher import MultiWorkspaceWatcher
+
+        store = MagicMock()
+        store.staging_list.return_value = [{"filename": "orders.yaml", "action": "upsert"}]
+        store.staging_fetch.side_effect = lambda target: (
+            Path(target) / "orders.yaml"
+        ).write_text("semantic_model:\n  name: orders\n", encoding="utf-8")
+        watcher = MultiWorkspaceWatcher.__new__(MultiWorkspaceWatcher)
+        watcher._config_dir = Path("config")
+        watcher._workspaces = {"test": SimpleNamespace(store=store)}
+        watcher._staging_validated = set()
+
+        with (
+            patch("store.bootstrap.pre_validate_physical", return_value=(True, "")),
+            patch(
+                "store.bootstrap.bootstrap",
+                return_value=(False, "Validation failed: no entities"),
+            ) as bootstrap,
+        ):
+            valid, message, details = watcher.validate_staging("test")
+
+        self.assertFalse(valid)
+        self.assertEqual(details["phase"], "semantic")
+        self.assertIn("no entities", message)
+        self.assertTrue(bootstrap.call_args.kwargs["check_entities"])
+
 
 class TestWorkspaceSemanticGrants(unittest.TestCase):
     def test_commit_grants_every_table_for_a_new_workspace(self):

@@ -228,7 +228,66 @@ def _copy_and_normalize_models(source_dir: Path, temp_dir: Path) -> bool:
     return any_modified
 
 
-def bootstrap_from_yaml(models_dir: Path, workspace_dir: Path) -> tuple[bool, str]:
+def _model_location(semantic_model) -> str:
+    metadata = getattr(semantic_model, "metadata", None)
+    filename = metadata.file_slice.filename if metadata else None
+    return f" ({Path(filename).name})" if filename else ""
+
+
+def check_semantic_model_entities(manifest) -> list[str]:
+    """Return blocking entity problems in a parsed semantic manifest.
+
+    Parsing alone does not run MetricFlow's semantic validation rules, so a
+    model with no entities, no primary entity, or an entity with an empty
+    ``expr`` used to pass Validate and only fail later at query time.
+    """
+    from metricflow.semantic_interfaces.validations.primary_entity import PrimaryEntityRule
+    from metricflow.semantic_interfaces.validations.semantic_manifest_validator import (
+        SemanticManifestValidator,
+    )
+
+    errors: list[str] = []
+    models_by_name = {model.name: model for model in manifest.semantic_models}
+    models_without_entities: set[str] = set()
+
+    for model in manifest.semantic_models:
+        location = _model_location(model)
+        if not model.entities:
+            models_without_entities.add(model.name)
+            errors.append(
+                f"Semantic model `{model.name}`{location} declares no entities. "
+                "Add an entity with type primary so rows have a join identity."
+            )
+        for entity in model.entities:
+            if entity.expr is not None and not entity.expr.strip():
+                errors.append(
+                    f"Entity `{entity.name}` in semantic model `{model.name}`{location} "
+                    "has an empty expr. Remove expr to use the entity name as the column, "
+                    "or set it to a column or SQL expression."
+                )
+
+    result = SemanticManifestValidator(rules=[PrimaryEntityRule()]).validate_semantic_manifest(
+        manifest
+    )
+    for issue in result.all_issues:
+        model_ref = getattr(getattr(issue, "context", None), "semantic_model", None)
+        model_name = getattr(model_ref, "semantic_model_name", None)
+        if model_name in models_without_entities:
+            # Already reported as "declares no entities" above.
+            continue
+        model = models_by_name.get(model_name)
+        location = _model_location(model) if model is not None else ""
+        errors.append(f"{issue.message}{location}")
+
+    return errors
+
+
+def bootstrap_from_yaml(
+    models_dir: Path,
+    workspace_dir: Path,
+    *,
+    check_entities: bool = False,
+) -> tuple[bool, str]:
     """Parse YAML model files directly into a semantic manifest.
 
     No dbt, no Doris connection, no dbt_project.yml or profiles.yml needed.
@@ -239,6 +298,9 @@ def bootstrap_from_yaml(models_dir: Path, workspace_dir: Path) -> tuple[bool, st
     Args:
         models_dir: Directory containing semantic model and metric YAML files
         workspace_dir: Workspace directory where target/semantic_manifest.json will be written
+        check_entities: Also reject models with missing or empty entities.
+            Used by staging Validate; reloads of already published models
+            keep the previous behavior so an existing workspace keeps loading.
 
     Returns:
         (success, error_message)
@@ -281,6 +343,13 @@ def bootstrap_from_yaml(models_dir: Path, workspace_dir: Path) -> tuple[bool, st
     if manifest is None:
         return False, "YAML parsing produced no manifest"
 
+    if check_entities:
+        entity_errors = check_semantic_model_entities(manifest)
+        if entity_errors:
+            msg = "; ".join(entity_errors[:5])
+            logger.error(f"Validation issues: {msg}")
+            return False, f"Validation failed: {msg}"
+
     # Write the compiled manifest to target/
     target_dir = workspace_dir / "target"
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -295,19 +364,26 @@ def bootstrap_from_yaml(models_dir: Path, workspace_dir: Path) -> tuple[bool, st
         return False, f"Failed to write manifest: {e}"
 
 
-def bootstrap(config_dir: Path, workspace_dir: Path, models_dir: Path | None = None) -> tuple[bool, str]:
+def bootstrap(
+    config_dir: Path,
+    workspace_dir: Path,
+    models_dir: Path | None = None,
+    *,
+    check_entities: bool = False,
+) -> tuple[bool, str]:
     """Full bootstrap: parse YAML models directly into semantic_manifest.json.
 
     Args:
         config_dir: Config directory (used only for default models_dir resolution)
         workspace_dir: Workspace directory
         models_dir: Override for user models directory. Defaults to config_dir/models.
+        check_entities: See :func:`bootstrap_from_yaml`.
 
     Returns:
         (success, error_message)
     """
     effective_models = models_dir or (config_dir / "models")
-    return bootstrap_from_yaml(effective_models, workspace_dir)
+    return bootstrap_from_yaml(effective_models, workspace_dir, check_entities=check_entities)
 
 
 def _collect_physical_tables_from_doc(doc: dict) -> set[str]:

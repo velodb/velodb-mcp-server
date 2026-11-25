@@ -301,7 +301,8 @@ validate commit  discard
 validate_staging(workspace)
   1. staging_fetch()               → merge active + staging into a temp directory
   2. pre_validate_physical()       → YAML syntax, file structure, table existence
-  3. bootstrap()                   → MetricFlow build into a temp workspace
+  3. bootstrap(check_entities=True) → MetricFlow build into a temp workspace, plus entity checks
+                                     (each model needs entities and one primary entity; no empty entity expr)
   4. SemanticManifest.load()       → parse the generated semantic_manifest.json
   5. _check_staging_duplicates()   → cross-file duplicate measure/model name detection
   6. Return (pass/fail, message, details including the metric list)
